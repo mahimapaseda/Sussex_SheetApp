@@ -100,7 +100,8 @@ app.post('/api/whatsapp/connect', async (req, res) => {
 
 app.post('/api/whatsapp/disconnect', async (req, res) => {
   try {
-    const status = await whatsappClient.disconnectClient();
+    const clean = req.query.clean !== 'false' && req.body?.clean !== false;
+    const status = await whatsappClient.disconnectClient(clean);
     res.json({ success: true, status });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
