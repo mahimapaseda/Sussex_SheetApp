@@ -108,6 +108,28 @@ async function run() {
   assert.strictEqual(sheetsRes.body.totalRows, 0);
   console.log('  ✓ GET /api/sheets/load starts completely clean with 0 records');
 
+  // Test 5: Image Sharing API (Upload, Toggle, Delete)
+  const sampleBase64Png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+  const imgUploadRes = await post('/api/template/image', {
+    dataUrl: sampleBase64Png,
+    originalName: 'test-flyer.png'
+  });
+  assert.strictEqual(imgUploadRes.status, 200);
+  assert.strictEqual(imgUploadRes.body.success, true);
+  assert.strictEqual(imgUploadRes.body.image.enabled, true);
+  console.log('  ✓ POST /api/template/image stores campaign image asset');
+
+  const imgToggleRes = await post('/api/template/image/toggle', { enabled: false });
+  assert.strictEqual(imgToggleRes.status, 200);
+  assert.strictEqual(imgToggleRes.body.image.enabled, false);
+  console.log('  ✓ POST /api/template/image/toggle toggles image sharing state');
+
+  const imgDeleteRes = await del('/api/template/image');
+  assert.strictEqual(imgDeleteRes.status, 200);
+  assert.strictEqual(imgDeleteRes.body.success, true);
+  assert.strictEqual(imgDeleteRes.body.image.enabled, false);
+  console.log('  ✓ DELETE /api/template/image clears attached flyer asset');
+
   console.log('\n==============================================');
   console.log('  API INTEGRATION VERIFICATION PASSED!        ');
   console.log('==============================================');

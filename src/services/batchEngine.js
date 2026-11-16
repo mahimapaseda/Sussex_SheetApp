@@ -1,3 +1,4 @@
+const fs = require('fs');
 const { interpolateTemplate } = require('./templateParser');
 const { sanitizePhoneNumber } = require('./phoneNormalizer');
 const ledger = require('./ledger');
@@ -224,11 +225,17 @@ async function processNextItem() {
   console.log(`[BatchEngine] [${queueIndex + 1}/${activeQueue.length}] Sending to ${item.name} (${item.normalizedPhone})...`);
 
   let sendResult = { success: false, error: 'WhatsApp not connected' };
+  let mediaPath = null;
+  if (currentSettings.attachedImage?.enabled && currentSettings.attachedImage?.path) {
+    if (fs.existsSync(currentSettings.attachedImage.path)) {
+      mediaPath = currentSettings.attachedImage.path;
+    }
+  }
 
   // If WhatsApp is connected, send message, else simulate if in mock/dev
   const waStatus = whatsappClient.getStatus();
   if (waStatus.isReady) {
-    sendResult = await whatsappClient.sendMessage(item.normalizedPhone, item.message);
+    sendResult = await whatsappClient.sendMessage(item.normalizedPhone, item.message, mediaPath);
   } else {
     // If client is not ready and no real connection, record reason
     sendResult = { success: false, error: 'WhatsApp Web is not authenticated or connected' };
@@ -242,7 +249,8 @@ async function processNextItem() {
       phone: item.normalizedPhone,
       name: item.name,
       campaign: campaignStats.campaignId,
-      status: 'SENT'
+      status: 'SENT',
+      method: mediaPath ? 'whatsapp-web.js (with image)' : 'whatsapp-web.js'
     });
   } else {
     campaignStats.failed += 1;

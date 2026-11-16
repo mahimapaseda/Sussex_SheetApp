@@ -35,7 +35,16 @@ const DEFAULT_SETTINGS = {
   statusColumn: 'WhatsApp Status',
 
   // Default Template
-  messageTemplate: 'Hello {Name}, this is an automated update regarding your record. Please let us know if you need any assistance!\n\nBest regards'
+  messageTemplate: 'Hello {Name}, this is an automated update regarding your record. Please let us know if you need any assistance!\n\nBest regards',
+
+  // Attached Image / Flyer Sharing
+  attachedImage: {
+    enabled: false,
+    fileName: '',
+    originalName: '',
+    path: '',
+    url: ''
+  }
 };
 
 function loadSettings() {
@@ -135,6 +144,23 @@ function toggleBranch(id) {
   return branch;
 }
 
+function updateAttachedImage(imageData) {
+  const current = loadSettings();
+  const updated = {
+    ...DEFAULT_SETTINGS.attachedImage,
+    ...(current.attachedImage || {}),
+    ...imageData
+  };
+  saveSettings({ attachedImage: updated });
+  return updated;
+}
+
+function deleteAttachedImage() {
+  const resetImage = { ...DEFAULT_SETTINGS.attachedImage };
+  saveSettings({ attachedImage: resetImage });
+  return resetImage;
+}
+
 module.exports = {
   loadSettings,
   saveSettings,
@@ -143,6 +169,8 @@ module.exports = {
   updateBranch,
   deleteBranch,
   toggleBranch,
+  updateAttachedImage,
+  deleteAttachedImage,
   extractSpreadsheetId,
   DEFAULT_SETTINGS
 };

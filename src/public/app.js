@@ -11,6 +11,7 @@ let appState = {
   branches: [],
   selectedBranchFilter: 'ALL',
   rosterRecords: [],
+  attachedImage: null,
   pollingTimer: null
 };
 
@@ -115,6 +116,8 @@ const els = {
   sliderCooldown: $('sliderCooldown'),
   displayCooldown: $('displayCooldown'),
   displayEstimatedTime: $('displayEstimatedTime'),
+  btnSaveTemplateControls: $('btnSaveTemplateControls'),
+  saveTemplateSuccessIndicator: $('saveTemplateSuccessIndicator'),
 
   // Ledger Tab
   ledgerRowsContainer: $('ledgerRowsContainer'),
@@ -150,8 +153,72 @@ const els = {
   btnSaveConfig: $('btnSaveConfig'),
 
   openTemplateModalBtn: $('openTemplateModalBtn'),
-  mobileTemplateModalBtn: $('mobileTemplateModalBtn')
+  mobileTemplateModalBtn: $('mobileTemplateModalBtn'),
+
+  // Developer Attribution Modal
+  developerModal: $('developerModal'),
+  openDeveloperModalBtn: $('openDeveloperModalBtn'),
+  closeDeveloperModalBtn: $('closeDeveloperModalBtn'),
+  doneDeveloperModalBtn: $('doneDeveloperModalBtn'),
+
+  // Attached Image Sharing
+  toggleAttachImageCheckbox: $('toggleAttachImageCheckbox'),
+  imageUploadDropzone: $('imageUploadDropzone'),
+  attachedImageFileInput: $('attachedImageFileInput'),
+  imagePreviewCard: $('imagePreviewCard'),
+  attachedImagePreviewThumb: $('attachedImagePreviewThumb'),
+  attachedImageFileName: $('attachedImageFileName'),
+  attachedImageStatusBadge: $('attachedImageStatusBadge'),
+  btnChangeAttachedImage: $('btnChangeAttachedImage'),
+  btnRemoveAttachedImage: $('btnRemoveAttachedImage'),
+  manualIncludeImageCheckbox: $('manualIncludeImageCheckbox'),
+  manualAttachImageThumb: $('manualAttachImageThumb'),
+  manualAttachImageRow: $('manualAttachImageRow'),
+
+  // Toast Container
+  toastContainer: $('toastContainer')
 };
+
+// In-App Toast Notification Popup
+function showToast(message, type = 'info') {
+  if (!els.toastContainer) return;
+
+  const toast = document.createElement('div');
+  const styles = type === 'success'
+    ? 'bg-emerald-600 dark:bg-emerald-700 border-emerald-700 text-white'
+    : type === 'error'
+    ? 'bg-red-600 dark:bg-red-700 border-red-700 text-white'
+    : type === 'warning'
+    ? 'bg-amber-600 dark:bg-amber-700 border-amber-700 text-white'
+    : 'bg-[#1B365D] dark:bg-slate-800 border-[#152A4A] dark:border-slate-700 text-white';
+
+  const icon = type === 'success'
+    ? 'fa-circle-check'
+    : type === 'error'
+    ? 'fa-circle-exclamation'
+    : type === 'warning'
+    ? 'fa-triangle-exclamation'
+    : 'fa-circle-info';
+
+  toast.className = `pointer-events-auto px-4 py-3 rounded-lg text-xs font-medium shadow-2xl border flex items-center gap-2.5 transition-all duration-300 transform opacity-0 translate-y-3 ${styles}`;
+  toast.innerHTML = `
+    <i class="fa-solid ${icon} text-sm shrink-0"></i>
+    <span class="leading-snug">${escapeHtml(message)}</span>
+    <button type="button" class="ml-auto pl-2 text-white/80 hover:text-white transition shrink-0" onclick="this.parentElement.remove()">
+      <i class="fa-solid fa-xmark text-xs"></i>
+    </button>
+  `;
+
+  els.toastContainer.appendChild(toast);
+  requestAnimationFrame(() => {
+    toast.classList.remove('opacity-0', 'translate-y-3');
+  });
+
+  setTimeout(() => {
+    toast.classList.add('opacity-0', 'translate-y-3');
+    setTimeout(() => toast.remove(), 350);
+  }, 4000);
+}
 
 // Lifecycle Start
 document.addEventListener('DOMContentLoaded', () => {
@@ -282,6 +349,32 @@ function bindEvents() {
   els.closeSettingsModalBtn?.addEventListener('click', closeSettingsModal);
   els.btnSaveConfig?.addEventListener('click', saveSettingsConfig);
 
+  // Developer Attribution & QR Modal
+  const openDeveloperModal = () => els.developerModal?.classList.remove('hidden');
+  const closeDeveloperModal = () => els.developerModal?.classList.add('hidden');
+  els.openDeveloperModalBtn?.addEventListener('click', openDeveloperModal);
+  els.closeDeveloperModalBtn?.addEventListener('click', closeDeveloperModal);
+  els.doneDeveloperModalBtn?.addEventListener('click', closeDeveloperModal);
+
+  // Close modals on backdrop click
+  [els.branchesModal, els.settingsModal, els.whatsappModal, els.manualSendModal, els.developerModal].forEach(modal => {
+    if (!modal) return;
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) modal.classList.add('hidden');
+    });
+  });
+
+  // Close modals on Escape key
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      [els.branchesModal, els.settingsModal, els.whatsappModal, els.manualSendModal, els.developerModal].forEach(modal => {
+        if (modal && !modal.classList.contains('hidden')) {
+          modal.classList.add('hidden');
+        }
+      });
+    }
+  });
+
   // Ledger
   els.btnClearLedgerHistory?.addEventListener('click', clearLedgerHistory);
 
@@ -289,6 +382,35 @@ function bindEvents() {
   els.rosterSearchInput?.addEventListener('input', filterRosterTable);
   els.selectPhoneCol?.addEventListener('change', () => loadSheets(false));
   els.selectNameCol?.addEventListener('change', () => loadSheets(false));
+
+  // Attached Image Sharing Events
+  els.imageUploadDropzone?.addEventListener('click', () => els.attachedImageFileInput?.click());
+  els.btnChangeAttachedImage?.addEventListener('click', () => els.attachedImageFileInput?.click());
+  els.attachedImageFileInput?.addEventListener('change', (e) => {
+    const file = e.target.files?.[0];
+    if (file) uploadAttachedImage(file);
+    e.target.value = '';
+  });
+
+  els.imageUploadDropzone?.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    els.imageUploadDropzone.classList.add('border-[#1B365D]', 'bg-blue-50/20');
+  });
+  els.imageUploadDropzone?.addEventListener('dragleave', (e) => {
+    e.preventDefault();
+    els.imageUploadDropzone.classList.remove('border-[#1B365D]', 'bg-blue-50/20');
+  });
+  els.imageUploadDropzone?.addEventListener('drop', (e) => {
+    e.preventDefault();
+    els.imageUploadDropzone.classList.remove('border-[#1B365D]', 'bg-blue-50/20');
+    const file = e.dataTransfer?.files?.[0];
+    if (file) uploadAttachedImage(file);
+  });
+
+  els.toggleAttachImageCheckbox?.addEventListener('change', (e) => {
+    toggleAttachedImage(e.target.checked);
+  });
+  els.btnRemoveAttachedImage?.addEventListener('click', deleteAttachedImage);
 
   // Template & Sliders
   els.mainTemplateTextarea?.addEventListener('input', updateTemplateLivePreview);
@@ -302,6 +424,7 @@ function bindEvents() {
   });
   els.inputPacingMin?.addEventListener('input', updatePacingDisplay);
   els.inputPacingMax?.addEventListener('input', updatePacingDisplay);
+  els.btnSaveTemplateControls?.addEventListener('click', saveTemplateAndLimits);
 }
 
 function updatePacingDisplay() {
@@ -335,7 +458,7 @@ function switchTab(tabKey) {
 
 // Initial Data Loader
 async function loadAll() {
-  await Promise.all([fetchStatus(), loadBranches(), loadSheets(false), loadSettingsData()]);
+  await Promise.all([fetchStatus(), loadBranches(), loadSheets(false), loadSettingsData(), loadAttachedImageData()]);
 }
 
 async function fetchStatus() {
@@ -506,7 +629,7 @@ async function saveBranchForm() {
   const spreadsheetUrl = els.branchInputUrl?.value.trim();
 
   if (!name || !spreadsheetUrl) {
-    alert('Please enter a branch name and Google Sheet URL.');
+    showToast('Please enter a branch name and Google Sheet URL.', 'warning');
     return;
   }
 
@@ -522,14 +645,15 @@ async function saveBranchForm() {
     const data = await res.json();
 
     if (data.success) {
+      showToast(`Branch "${name}" saved successfully.`, 'success');
       hideBranchDrawer();
       await loadBranches();
       await loadSheets(true);
     } else {
-      alert(`Could not save branch: ${data.error}`);
+      showToast(`Could not save branch: ${data.error}`, 'error');
     }
   } catch (err) {
-    alert(`Error: ${err.message}`);
+    showToast(`Error: ${err.message}`, 'error');
   }
 }
 
@@ -855,28 +979,32 @@ async function launchBatchCampaign() {
     });
     const data = await res.json();
     if (data.success) {
+      showToast('Safe Batch Dispatch launched!', 'success');
       fetchStatus();
     } else {
-      alert(`Could not start campaign: ${data.error}`);
+      showToast(`Could not start campaign: ${data.error}`, 'error');
     }
   } catch (err) {
-    alert(`Error: ${err.message}`);
+    showToast(`Error: ${err.message}`, 'error');
   }
 }
 
 async function pauseCampaign() {
   await fetch('/api/campaign/pause', { method: 'POST' });
+  showToast('Campaign paused.', 'warning');
   fetchStatus();
 }
 
 async function resumeCampaign() {
   await fetch('/api/campaign/resume', { method: 'POST' });
+  showToast('Campaign resumed.', 'info');
   fetchStatus();
 }
 
 async function abortCampaign() {
   if (confirm('Abort active dispatch campaign?')) {
     await fetch('/api/campaign/abort', { method: 'POST' });
+    showToast('Campaign aborted.', 'warning');
     fetchStatus();
   }
 }
@@ -907,6 +1035,21 @@ async function resetWhatsAppSession() {
 
 // Manual Send Modal
 function openManualModal() {
+  const img = appState.attachedImage;
+  if (img && img.fileName && img.url) {
+    if (els.manualAttachImageRow) {
+      els.manualAttachImageRow.classList.remove('hidden');
+      if (els.manualAttachImageThumb) {
+        els.manualAttachImageThumb.src = img.url;
+        els.manualAttachImageThumb.classList.remove('hidden');
+      }
+      if (els.manualIncludeImageCheckbox) {
+        els.manualIncludeImageCheckbox.checked = !!img.enabled;
+      }
+    }
+  } else {
+    els.manualAttachImageRow?.classList.add('hidden');
+  }
   els.manualSendModal?.classList.remove('hidden');
 }
 function closeManualModal() {
@@ -918,9 +1061,10 @@ async function handleManualSendSubmit(e) {
   const phone = els.manualInputPhone?.value.trim();
   const name = els.manualInputName?.value.trim();
   const message = els.manualInputMessage?.value.trim();
+  const includeImage = els.manualIncludeImageCheckbox?.checked || false;
 
   if (!phone || !message) {
-    alert('Phone and message are required.');
+    showToast('Phone and message are required.', 'warning');
     return;
   }
 
@@ -928,18 +1072,129 @@ async function handleManualSendSubmit(e) {
     const res = await fetch('/api/whatsapp/send-single', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone, name, message })
+      body: JSON.stringify({ phone, name, message, includeImage })
     });
     const data = await res.json();
     if (data.success) {
-      alert('Message dispatched successfully via WhatsApp!');
+      showToast('Message dispatched successfully via WhatsApp!', 'success');
       closeManualModal();
       fetchStatus();
     } else {
-      alert(`Send failed: ${data.error}`);
+      showToast(`Send failed: ${data.error}`, 'error');
     }
   } catch (err) {
-    alert(`Error: ${err.message}`);
+    showToast(`Error: ${err.message}`, 'error');
+  }
+}
+
+// Attached Flyer / Image Management
+async function loadAttachedImageData() {
+  try {
+    const res = await fetch('/api/template/image');
+    const data = await res.json();
+    const img = data.image;
+    appState.attachedImage = img;
+    renderAttachedImageUI(img);
+  } catch (e) {
+    console.error('Failed to load attached image:', e);
+  }
+}
+
+function renderAttachedImageUI(img) {
+  const hasImage = img && img.fileName && img.url;
+  if (els.toggleAttachImageCheckbox) {
+    els.toggleAttachImageCheckbox.checked = !!(img && img.enabled);
+  }
+
+  if (hasImage) {
+    els.imageUploadDropzone?.classList.add('hidden');
+    els.imagePreviewCard?.classList.remove('hidden');
+    if (els.attachedImagePreviewThumb) els.attachedImagePreviewThumb.src = img.url;
+    if (els.attachedImageFileName) els.attachedImageFileName.textContent = img.originalName || img.fileName;
+    if (els.attachedImageStatusBadge) {
+      if (img.enabled) {
+        els.attachedImageStatusBadge.className = 'inline-block mt-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800';
+        els.attachedImageStatusBadge.textContent = 'Active · Included with messages';
+      } else {
+        els.attachedImageStatusBadge.className = 'inline-block mt-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400 border border-gray-200 dark:border-gray-700';
+        els.attachedImageStatusBadge.textContent = 'Paused · Text only';
+      }
+    }
+  } else {
+    els.imageUploadDropzone?.classList.remove('hidden');
+    els.imagePreviewCard?.classList.add('hidden');
+    if (els.manualAttachImageRow) els.manualAttachImageRow.classList.add('hidden');
+  }
+}
+
+async function uploadAttachedImage(file) {
+  if (!file) return;
+  if (!file.type.startsWith('image/')) {
+    showToast('Please select a valid image file (PNG, JPG, or WebP).', 'warning');
+    return;
+  }
+  if (file.size > 10 * 1024 * 1024) {
+    showToast('File size exceeds 10MB limit.', 'warning');
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = async () => {
+    try {
+      const res = await fetch('/api/template/image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          dataUrl: reader.result,
+          originalName: file.name
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        appState.attachedImage = data.image;
+        renderAttachedImageUI(data.image);
+        showToast('Flyer image uploaded successfully.', 'success');
+      } else {
+        showToast(`Failed to save image: ${data.error}`, 'error');
+      }
+    } catch (e) {
+      showToast(`Upload error: ${e.message}`, 'error');
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+async function toggleAttachedImage(enabled) {
+  try {
+    const res = await fetch('/api/template/image/toggle', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled })
+    });
+    const data = await res.json();
+    if (data.success) {
+      appState.attachedImage = data.image;
+      renderAttachedImageUI(data.image);
+      showToast(enabled ? 'Flyer image enabled for dispatches.' : 'Flyer image paused (text-only).', 'info');
+    }
+  } catch (e) {
+    console.error('Toggle image error:', e);
+  }
+}
+
+async function deleteAttachedImage() {
+  if (confirm('Remove the attached flyer image from templates?')) {
+    try {
+      const res = await fetch('/api/template/image', { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        appState.attachedImage = data.image;
+        renderAttachedImageUI(data.image);
+        showToast('Flyer image removed.', 'info');
+      }
+    } catch (e) {
+      showToast('Failed to delete image', 'error');
+    }
   }
 }
 
@@ -962,7 +1217,65 @@ async function loadSettingsData() {
     if (els.mainTemplateTextarea && s.messageTemplate) {
       els.mainTemplateTextarea.value = s.messageTemplate;
     }
+    if (els.sliderBatchSize && s.batchSize) {
+      els.sliderBatchSize.value = s.batchSize;
+      if (els.displayBatchSize) els.displayBatchSize.textContent = `${s.batchSize} recipients`;
+    }
+    if (els.inputPacingMin && s.minDelaySeconds) els.inputPacingMin.value = s.minDelaySeconds;
+    if (els.inputPacingMax && s.maxDelaySeconds) els.inputPacingMax.value = s.maxDelaySeconds;
+    if (els.displayPacingDelay && s.minDelaySeconds && s.maxDelaySeconds) {
+      els.displayPacingDelay.textContent = `${s.minDelaySeconds} - ${s.maxDelaySeconds}s`;
+    }
+    if (els.sliderCooldown && s.cooldownMinutes) {
+      els.sliderCooldown.value = s.cooldownMinutes;
+      if (els.displayCooldown) els.displayCooldown.textContent = `${s.cooldownMinutes} minutes`;
+    }
+    updateTemplateLivePreview();
   } catch (e) {}
+}
+
+async function saveTemplateAndLimits() {
+  const payload = {
+    messageTemplate: els.mainTemplateTextarea?.value || '',
+    batchSize: parseInt(els.sliderBatchSize?.value || 15, 10),
+    minDelaySeconds: parseInt(els.inputPacingMin?.value || 12, 10),
+    maxDelaySeconds: parseInt(els.inputPacingMax?.value || 22, 10),
+    cooldownMinutes: parseInt(els.sliderCooldown?.value || 3, 10)
+  };
+
+  try {
+    if (els.btnSaveTemplateControls) {
+      els.btnSaveTemplateControls.disabled = true;
+      els.btnSaveTemplateControls.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Saving...';
+    }
+
+    const res = await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (data.success) {
+      if (els.saveTemplateSuccessIndicator) {
+        els.saveTemplateSuccessIndicator.classList.remove('hidden');
+        setTimeout(() => {
+          els.saveTemplateSuccessIndicator?.classList.add('hidden');
+        }, 3000);
+      }
+      showToast('Template and Anti-Ban pacing saved successfully!', 'success');
+      fetchStatus();
+      updateTemplateLivePreview();
+    } else {
+      showToast('Failed to save settings', 'error');
+    }
+  } catch (err) {
+    showToast(`Save error: ${err.message}`, 'error');
+  } finally {
+    if (els.btnSaveTemplateControls) {
+      els.btnSaveTemplateControls.disabled = false;
+      els.btnSaveTemplateControls.innerHTML = '<i class="fa-solid fa-floppy-disk mr-1"></i> <span>Save Changes</span>';
+    }
+  }
 }
 
 async function saveSettingsConfig() {
@@ -982,12 +1295,12 @@ async function saveSettingsConfig() {
     });
     const data = await res.json();
     if (data.success) {
-      alert('Settings saved successfully!');
+      showToast('Settings saved successfully!', 'success');
       closeSettingsModal();
       fetchStatus();
     }
   } catch (e) {
-    alert('Failed to save settings');
+    showToast('Failed to save settings', 'error');
   }
 }
 

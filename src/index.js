@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 const config = require('./config/env');
 const settings = require('./services/settings');
 const googleSheets = require('./services/googleSheets');
@@ -9,10 +10,17 @@ const batchEngine = require('./services/batchEngine');
 const ledger = require('./services/ledger');
 const { extractTokens, interpolateTemplate } = require('./services/templateParser');
 
+process.on('unhandledRejection', (reason) => {
+  console.warn('[Process] Handled unhandled rejection:', reason?.message || reason);
+});
+process.on('uncaughtException', (err) => {
+  console.warn('[Process] Handled uncaught exception:', err?.message || err);
+});
+
 const app = express();
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '25mb' }));
 
 // Serve static frontend UI and design system
 app.use(express.static(path.join(__dirname, 'public')));
@@ -219,21 +227,96 @@ app.get('/api/ledger/export', (req, res) => {
   res.send(csvHeaders + rows);
 });
 
+// 6. Template Attached Image APIs
+app.get('/api/template/image', (req, res) => {
+  const current = settings.loadSettings();
+  res.json({ success: true, image: current.attachedImage || null });
+});
+
+app.post('/api/template/image', (req, res) => {
+  try {
+    const { dataUrl, originalName } = req.body;
+    if (!dataUrl) {
+      return res.status(400).json({ success: false, error: 'No image data provided' });
+    }
+
+    const matches = dataUrl.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+    if (!matches || matches.length !== 3) {
+      return res.status(400).json({ success: false, error: 'Invalid dataUrl format' });
+    }
+
+    const mime = matches[1];
+    const buffer = Buffer.from(matches[2], 'base64');
+    const ext = mime.includes('jpeg') || mime.includes('jpg') ? 'jpg' : (mime.includes('webp') ? 'webp' : 'png');
+    const fileName = `flyer_${Date.now()}.${ext}`;
+    const fullPath = path.join(config.ASSETS_DIR, fileName);
+
+    fs.writeFileSync(fullPath, buffer);
+    console.log(`[Image] Saved new attached image to ${fullPath} (${buffer.length} bytes)`);
+
+    const updated = settings.updateAttachedImage({
+      enabled: true,
+      fileName,
+      originalName: originalName || fileName,
+      path: fullPath,
+      url: `/assets/${fileName}`
+    });
+
+    res.json({ success: true, image: updated });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/template/image/toggle', (req, res) => {
+  try {
+    const { enabled } = req.body;
+    const updated = settings.updateAttachedImage({ enabled: !!enabled });
+    res.json({ success: true, image: updated });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.delete('/api/template/image', (req, res) => {
+  try {
+    const current = settings.loadSettings();
+    if (current.attachedImage?.path && fs.existsSync(current.attachedImage.path)) {
+      try {
+        fs.unlinkSync(current.attachedImage.path);
+      } catch (e) {}
+    }
+    const reset = settings.deleteAttachedImage();
+    res.json({ success: true, image: reset });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 app.post('/api/whatsapp/send-single', async (req, res) => {
   try {
-    const { phone, message, name } = req.body;
+    const { phone, message, name, includeImage } = req.body;
     const currentSettings = settings.loadSettings();
     const phoneResult = require('./services/phoneNormalizer').sanitizePhoneNumber(phone, currentSettings.defaultCountryCode);
     if (!phoneResult.isValid) {
       return res.status(400).json({ success: false, error: 'Invalid phone number format' });
     }
-    const sendResult = await whatsappClient.sendMessage(phoneResult.normalized, message);
+
+    let mediaPath = null;
+    if (includeImage && currentSettings.attachedImage?.enabled && currentSettings.attachedImage?.path) {
+      if (fs.existsSync(currentSettings.attachedImage.path)) {
+        mediaPath = currentSettings.attachedImage.path;
+      }
+    }
+
+    const sendResult = await whatsappClient.sendMessage(phoneResult.normalized, message, mediaPath);
     if (sendResult.success) {
       ledger.recordSent({
         phone: phoneResult.normalized,
         name: name || 'Manual Recipient',
         campaign: 'manual_dispatch',
-        status: 'SENT'
+        status: 'SENT',
+        method: mediaPath ? 'whatsapp-web.js (with image)' : 'whatsapp-web.js'
       });
       res.json({ success: true, messageId: sendResult.messageId });
     } else {

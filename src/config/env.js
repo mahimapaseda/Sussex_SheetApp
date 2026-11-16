@@ -13,6 +13,7 @@ const APPDATA_DIR = process.env.APPDATA
   : path.join(__dirname, '../../data');
 
 const DATA_DIR = isPackaged ? APPDATA_DIR : path.join(__dirname, '../../data');
+const ASSETS_DIR = path.join(DATA_DIR, 'assets');
 
 if (!fs.existsSync(DATA_DIR)) {
   try {
@@ -22,10 +23,19 @@ if (!fs.existsSync(DATA_DIR)) {
   }
 }
 
+if (!fs.existsSync(ASSETS_DIR)) {
+  try {
+    fs.mkdirSync(ASSETS_DIR, { recursive: true });
+  } catch (e) {
+    console.warn('[Env] Could not create ASSETS_DIR:', e.message);
+  }
+}
+
 module.exports = {
   PORT,
   TIMEZONE,
   DEFAULT_COUNTRY_CODE,
   DATA_DIR,
+  ASSETS_DIR,
   isPackaged
 };
