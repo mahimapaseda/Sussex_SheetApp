@@ -4,6 +4,8 @@
  */
 
 const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
 const { sanitizePhoneNumber } = require('../src/services/phoneNormalizer');
 const { extractTokens, interpolateTemplate } = require('../src/services/templateParser');
 const { identifyColumns } = require('../src/services/googleSheets');
@@ -117,14 +119,25 @@ runTest('Record sent item and verify duplicate prevention', () => {
   const testPhone = '9477' + Math.floor(1000000 + Math.random() * 9000000);
   assert.strictEqual(ledger.hasBeenSentToday(testPhone), false);
 
-  ledger.recordSent({
-    phone: testPhone,
-    name: 'Test Student',
-    campaign: 'unit_test',
-    status: 'SENT'
-  });
+  const ledgerPath = path.join(require('../src/config/env').DATA_DIR, 'sent_log.json');
+  let rawInitial = '[]';
+  if (fs.existsSync(ledgerPath)) {
+    try { rawInitial = fs.readFileSync(ledgerPath, 'utf8'); } catch (e) {}
+  }
 
-  assert.strictEqual(ledger.hasBeenSentToday(testPhone), true);
+  try {
+    ledger.recordSent({
+      phone: testPhone,
+      name: 'Unit Test Record',
+      campaign: 'unit_test',
+      status: 'SENT'
+    });
+
+    assert.strictEqual(ledger.hasBeenSentToday(testPhone), true);
+  } finally {
+    // Always restore the exact initial contents so tests never pollute production ledger
+    fs.writeFileSync(ledgerPath, rawInitial, 'utf8');
+  }
 });
 
 console.log('\n==============================================');

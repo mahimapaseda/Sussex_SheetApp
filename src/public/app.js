@@ -185,12 +185,12 @@ function showToast(message, type = 'info') {
 
   const toast = document.createElement('div');
   const styles = type === 'success'
-    ? 'bg-emerald-600 dark:bg-emerald-700 border-emerald-700 text-white'
+    ? 'bg-emerald-600/95 dark:bg-emerald-700/95 border-emerald-500/50 text-white shadow-glow-emerald'
     : type === 'error'
-    ? 'bg-red-600 dark:bg-red-700 border-red-700 text-white'
+    ? 'bg-red-600/95 dark:bg-red-700/95 border-red-500/50 text-white'
     : type === 'warning'
-    ? 'bg-amber-600 dark:bg-amber-700 border-amber-700 text-white'
-    : 'bg-[#1B365D] dark:bg-slate-800 border-[#152A4A] dark:border-slate-700 text-white';
+    ? 'bg-amber-600/95 dark:bg-amber-700/95 border-amber-500/50 text-white'
+    : 'bg-[#1B365D]/95 dark:bg-slate-800/95 border-blue-400/30 text-white shadow-glow-blue';
 
   const icon = type === 'success'
     ? 'fa-circle-check'
@@ -200,7 +200,7 @@ function showToast(message, type = 'info') {
     ? 'fa-triangle-exclamation'
     : 'fa-circle-info';
 
-  toast.className = `pointer-events-auto px-4 py-3 rounded-lg text-xs font-medium shadow-2xl border flex items-center gap-2.5 transition-all duration-300 transform opacity-0 translate-y-3 ${styles}`;
+  toast.className = `pointer-events-auto px-4 py-3 rounded-2xl text-xs font-semibold backdrop-blur-2xl shadow-[0_16px_40px_rgba(0,0,0,0.25)] border flex items-center gap-3 transition-all duration-300 transform opacity-0 translate-y-3 ${styles}`;
   toast.innerHTML = `
     <i class="fa-solid ${icon} text-sm shrink-0"></i>
     <span class="leading-snug">${escapeHtml(message)}</span>
@@ -672,27 +672,27 @@ function renderBranchesList(branches = []) {
   }
 
   els.branchesListContainer.innerHTML = branches.map(b => `
-    <div class="app-toolbar p-3.5 rounded-lg border border-[var(--border-hairline)] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-      <div class="flex items-start gap-3 min-w-0">
-        <button type="button" class="mt-0.5 text-base ${b.enabled ? 'text-emerald-600' : 'text-gray-400'}" onclick="toggleBranchStatus('${b.id}')" title="${b.enabled ? 'Click to pause' : 'Click to enable'}">
-          <i class="fa-solid ${b.enabled ? 'fa-toggle-on' : 'fa-toggle-off'} text-lg"></i>
+    <div class="p-4 rounded-2xl bg-[var(--bg-toolbar)]/60 border border-[var(--border-hairline)] hover:border-blue-500/30 transition-all duration-300 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-sm">
+      <div class="flex items-start gap-3.5 min-w-0">
+        <button type="button" class="mt-0.5 text-base transition-transform hover:scale-110 ${b.enabled ? 'text-emerald-500' : 'text-gray-400'}" onclick="toggleBranchStatus('${b.id}')" title="${b.enabled ? 'Click to pause' : 'Click to enable'}">
+          <i class="fa-solid ${b.enabled ? 'fa-toggle-on' : 'fa-toggle-off'} text-xl"></i>
         </button>
         <div class="min-w-0">
           <div class="flex items-center gap-2">
-            <h4 class="font-bold text-[var(--text-primary)] truncate">${escapeHtml(b.name)}</h4>
-            <span class="px-1.5 py-0.2 rounded text-[10px] font-semibold ${b.enabled ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-500'}">
+            <h4 class="font-bold text-[var(--text-primary)] text-sm truncate font-display">${escapeHtml(b.name)}</h4>
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide ${b.enabled ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800' : 'bg-gray-100 dark:bg-gray-800 text-gray-500'}">
               ${b.enabled ? 'Active' : 'Paused'}
             </span>
           </div>
-          <p class="text-[11px] text-[var(--text-muted)] truncate">Tab: <strong>${escapeHtml(b.sheetName || 'Sheet1')}</strong> · ID: <code class="font-mono">${escapeHtml(b.spreadsheetId || '--')}</code></p>
+          <p class="text-[11px] text-[var(--text-muted)] mt-0.5 truncate font-medium">Tab: <strong class="text-[var(--text-secondary)]">${escapeHtml(b.sheetName || 'Sheet1')}</strong> · ID: <code class="font-mono text-[10px] bg-[var(--bg-panel)] px-1.5 py-0.5 rounded border border-[var(--border-hairline)]">${escapeHtml(b.spreadsheetId || '--')}</code></p>
         </div>
       </div>
 
       <div class="flex items-center gap-2 self-end sm:self-auto shrink-0">
-        <button type="button" class="btn-neutral px-2.5 py-1 rounded text-[11px] font-medium" onclick="editBranchSheet('${b.id}')">
+        <button type="button" class="btn-neutral px-3.5 py-1.5 rounded-full text-[11px] font-bold shadow-sm" onclick="editBranchSheet('${b.id}')">
           <i class="fa-solid fa-pen-to-square mr-1 text-[var(--text-muted)]"></i> Edit
         </button>
-        <button type="button" class="btn-neutral px-2.5 py-1 rounded text-[11px] font-medium text-red-600 hover:text-red-700" onclick="deleteBranchSheet('${b.id}')">
+        <button type="button" class="btn-neutral px-3.5 py-1.5 rounded-full text-[11px] font-bold text-red-600 hover:text-red-700 dark:text-red-400 shadow-sm" onclick="deleteBranchSheet('${b.id}')">
           <i class="fa-solid fa-trash-can mr-1"></i> Delete
         </button>
       </div>
@@ -881,27 +881,27 @@ function renderRosterTable(records = []) {
   }
 
   els.rosterTableBody.innerHTML = records.map(r => `
-    <tr class="hover:bg-[var(--bg-toolbar)] transition">
-      <td class="py-2.5 px-4 text-center font-mono text-[var(--text-muted)]">${r.rowIndex}</td>
-      <td class="py-2.5 px-4 font-semibold text-[var(--text-primary)]">${escapeHtml(r.name)}</td>
-      <td class="py-2.5 px-4 font-mono">
-        <span class="${r.isValidPhone ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-600'}">
+    <tr class="hover:bg-[var(--bg-toolbar)]/60 transition-colors duration-200">
+      <td class="py-3 px-5 text-center font-mono text-[var(--text-muted)] text-[11px]">${r.rowIndex}</td>
+      <td class="py-3 px-5 font-bold text-[var(--text-primary)]">${escapeHtml(r.name)}</td>
+      <td class="py-3 px-5 font-mono">
+        <span class="${r.isValidPhone ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : 'text-red-500 font-semibold'}">
           ${r.isValidPhone ? (r.phoneFormatted || r.normalizedPhone) : (r.rawPhone || 'Invalid')}
         </span>
       </td>
-      <td class="py-2.5 px-4 text-[var(--text-secondary)]">
-        <span class="inline-flex items-center gap-1">
+      <td class="py-3 px-5 text-[var(--text-secondary)]">
+        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[var(--bg-toolbar)] border border-[var(--border-hairline)]">
           <i class="fa-solid fa-building-columns text-[10px] text-[var(--text-muted)]"></i>
           <span>${escapeHtml(r.branch || 'Sussex Network')}</span>
         </span>
       </td>
-      <td class="py-2.5 px-4">
-        <span class="px-2 py-0.5 text-[11px] font-semibold rounded-full ${r.status === 'SENT' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 dark:bg-gray-800 text-[var(--text-secondary)]'}">
+      <td class="py-3 px-5">
+        <span class="px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide rounded-full ${r.status === 'SENT' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800' : 'bg-gray-100 dark:bg-gray-800/80 text-[var(--text-secondary)] border border-[var(--border-hairline)]'}">
           ${r.status || 'PENDING'}
         </span>
       </td>
-      <td class="py-2.5 px-4 text-right">
-        <button type="button" class="btn-neutral px-2.5 py-1 rounded text-[11px] font-medium" onclick="dispatchDirectToRow(${r.rowIndex})">
+      <td class="py-3 px-5 text-right">
+        <button type="button" class="btn-neutral px-3 py-1 rounded-full text-[11px] font-bold shadow-sm" onclick="dispatchDirectToRow(${r.rowIndex})">
           <i class="fa-solid fa-paper-plane mr-1 text-[var(--text-muted)]"></i> Send
         </button>
       </td>
