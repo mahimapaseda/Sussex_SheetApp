@@ -1,0 +1,38 @@
+{
+  "name": "sheetapp",
+  "version": "1.0.0",
+  "description": "SheetApp - Compliant Google Sheets & WhatsApp Batch Automation Platform",
+  "main": "electron/main.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "electron": "electron .",
+    "test": "node test/test-batch-engine.js && node test/test-server.js",
+    "build": "electron-builder --win"
+  },
+  "keywords": [
+    "whatsapp",
+    "google-sheets",
+    "batch-automation",
+    "anti-ban",
+    "rate-limiting",
+    "sheetapp"
+  ],
+  "author": "Sussex Network",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "csv-parse": "^5.5.6",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "googleapis": "^144.0.0",
+    "open": "^10.1.0",
+    "qrcode": "^1.5.4",
+    "whatsapp-web.js": "^1.26.0"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  }
+}

@@ -1,0 +1,9 @@
+node_modules/
+dist/
+build/
+.wwebjs_auth/
+.wwebjs_cache/
+data/sent_log.json
+.env
+.DS_Store
+Thumbs.db

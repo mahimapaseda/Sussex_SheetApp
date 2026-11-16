@@ -1,0 +1,17 @@
+{
+  "batchSize": 15,
+  "minDelaySeconds": 12,
+  "maxDelaySeconds": 22,
+  "cooldownMinutes": 3,
+  "dailyLimit": 250,
+  "defaultCountryCode": "94",
+  "branches": [],
+  "googleSheetId": "",
+  "googleSheetTab": "Sheet1",
+  "googleApiKey": "",
+  "serviceAccountPath": "",
+  "phoneColumn": "",
+  "nameColumn": "",
+  "statusColumn": "WhatsApp Status",
+  "messageTemplate": "Hello {Name}, this is an automated update regarding your record. Please let us know if you need any assistance!\n\nBest regards"
+}

@@ -1,0 +1,191 @@
+/**
+ * SheetApp Design Tokens (Three-Layer Architecture)
+ * Primitive -> Semantic -> Component
+ */
+
+:root {
+  /* ==========================================================================
+     LAYER 1: PRIMITIVE TOKENS (Raw values)
+     ========================================================================== */
+  
+  /* Color Primitives - Slate Neutrals */
+  --slate-50: #F8FAFC;
+  --slate-100: #F1F5F9;
+  --slate-200: #E2E8F0;
+  --slate-300: #CBD5E1;
+  --slate-400: #94A3B8;
+  --slate-500: #64748B;
+  --slate-600: #475569;
+  --slate-700: #334155;
+  --slate-800: #1E293B;
+  --slate-900: #0F172A;
+  --slate-950: #020617;
+
+  /* Color Primitives - Brand & WhatsApp Palette */
+  --emerald-500: #10B981;
+  --emerald-600: #059669;
+  --emerald-700: #047857;
+  --wa-light: #25D366;
+  --wa-dark: #128C7E;
+  --wa-deep: #075E54;
+
+  /* Functional Status Primitives */
+  --amber-50: #FFFBEB;
+  --amber-100: #FEF3C7;
+  --amber-500: #F59E0B;
+  --amber-700: #B45309;
+
+  --rose-50: #FFF1F2;
+  --rose-100: #FFE4E6;
+  --rose-500: #F43F5E;
+  --rose-700: #BE123C;
+
+  --blue-50: #EFF6FF;
+  --blue-100: #DBEAFE;
+  --blue-500: #3B82F6;
+  --blue-700: #1D4ED8;
+
+  /* Spacing Scale (4px base) */
+  --space-0: 0px;
+  --space-1: 0.25rem;  /* 4px */
+  --space-2: 0.5rem;   /* 8px */
+  --space-3: 0.75rem;  /* 12px */
+  --space-4: 1rem;     /* 16px */
+  --space-5: 1.25rem;  /* 20px */
+  --space-6: 1.5rem;   /* 24px */
+  --space-8: 2rem;     /* 32px */
+  --space-10: 2.5rem;  /* 40px */
+  --space-12: 3rem;    /* 48px */
+  --space-16: 4rem;    /* 64px */
+
+  /* Border Radii */
+  --radius-none: 0px;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+
+  /* Typography */
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+  --font-size-xs: 0.75rem;     /* 12px */
+  --font-size-sm: 0.875rem;    /* 14px */
+  --font-size-base: 1rem;      /* 16px */
+  --font-size-lg: 1.125rem;    /* 18px */
+  --font-size-xl: 1.25rem;     /* 20px */
+  --font-size-2xl: 1.5rem;     /* 24px */
+
+  /* Elevation Shadows */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+
+  /* Transitions */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ==========================================================================
+     LAYER 2: SEMANTIC TOKENS (Purpose-based aliases)
+     ========================================================================== */
+
+  /* Surfaces & Canvas */
+  --surface-canvas: var(--slate-50);
+  --surface-panel: #FFFFFF;
+  --surface-panel-secondary: var(--slate-100);
+  --surface-backdrop: rgba(15, 23, 42, 0.65);
+
+  /* Typography Colors */
+  --text-primary: var(--slate-900);
+  --text-secondary: var(--slate-600);
+  --text-muted: var(--slate-400);
+  --text-inverse: #FFFFFF;
+
+  /* Brand / Interaction */
+  --brand-primary: var(--wa-dark);
+  --brand-primary-hover: var(--wa-deep);
+  --brand-accent: var(--wa-light);
+
+  /* Borders */
+  --border-subtle: var(--slate-200);
+  --border-strong: var(--slate-300);
+  --border-focus: var(--wa-dark);
+
+  /* Batch Compliance & Platform Limits */
+  --status-safe-bg: var(--emerald-500);
+  --status-safe-fg: #FFFFFF;
+  --status-safe-subtle: #ECFDF5;
+  --status-safe-text: var(--emerald-700);
+
+  --status-pacing-bg: var(--blue-50);
+  --status-pacing-text: var(--blue-700);
+  --status-pacing-border: var(--blue-100);
+
+  --status-cooldown-bg: var(--amber-50);
+  --status-cooldown-text: var(--amber-700);
+  --status-cooldown-border: var(--amber-100);
+
+  --status-risk-bg: var(--rose-50);
+  --status-risk-text: var(--rose-700);
+  --status-risk-border: var(--rose-100);
+
+  /* ==========================================================================
+     LAYER 3: COMPONENT TOKENS (Component-specific mapping)
+     ========================================================================== */
+
+  /* Primary Action Button */
+  --btn-primary-bg: var(--brand-primary);
+  --btn-primary-bg-hover: var(--brand-primary-hover);
+  --btn-primary-text: var(--text-inverse);
+  --btn-primary-radius: var(--radius-md);
+  --btn-primary-shadow: var(--shadow-sm);
+
+  /* Secondary Button */
+  --btn-secondary-bg: var(--surface-panel);
+  --btn-secondary-bg-hover: var(--surface-panel-secondary);
+  --btn-secondary-border: var(--border-subtle);
+  --btn-secondary-text: var(--text-primary);
+
+  /* QR Scanner Container */
+  --qr-card-bg: var(--surface-panel);
+  --qr-card-border: var(--border-subtle);
+  --qr-card-radius: var(--radius-lg);
+  --qr-card-shadow: var(--shadow-lg);
+
+  /* Batch Progress Bar */
+  --progress-track: var(--slate-200);
+  --progress-fill: var(--brand-primary);
+  --progress-cooldown-fill: var(--amber-500);
+  --progress-radius: var(--radius-full);
+
+  /* Rate Limit Risk Gauge */
+  --gauge-low-risk: var(--emerald-500);
+  --gauge-mid-risk: var(--amber-500);
+  --gauge-high-risk: var(--rose-500);
+
+  /* Data Table / Row Preview */
+  --table-header-bg: var(--slate-100);
+  --table-border: var(--border-subtle);
+  --table-row-hover: var(--slate-50);
+  --table-row-selected: #F0FDF4;
+}
+
+/* Dark Theme Overrides */
+[data-theme="dark"] {
+  --surface-canvas: var(--slate-950);
+  --surface-panel: var(--slate-900);
+  --surface-panel-secondary: var(--slate-800);
+  --surface-backdrop: rgba(2, 6, 23, 0.85);
+
+  --text-primary: var(--slate-50);
+  --text-secondary: var(--slate-300);
+  --text-muted: var(--slate-500);
+
+  --border-subtle: var(--slate-800);
+  --border-strong: var(--slate-700);
+
+  --table-header-bg: var(--slate-800);
+  --table-border: var(--slate-800);
+  --table-row-hover: var(--slate-850);
+  --table-row-selected: rgba(18, 140, 126, 0.15);
+}
