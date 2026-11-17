@@ -10,18 +10,18 @@ if (!gotTheLock) {
 
 // ─── Low-Memory / Low-Spec Chromium Flags ──────────────────────────────────
 // Tuned for office PCs with 2–4 GB RAM (no discrete GPU)
+// Low-memory / integrated-GPU flags (safe for Windows 11, 4 GB RAM)
 app.commandLine.appendSwitch('disable-gpu');
 app.commandLine.appendSwitch('disable-gpu-compositing');
 app.commandLine.appendSwitch('disable-software-rasterizer');
 app.commandLine.appendSwitch('disable-background-networking');
 app.commandLine.appendSwitch('disable-background-timer-throttling');
 app.commandLine.appendSwitch('disable-renderer-backgrounding');
-app.commandLine.appendSwitch('disable-backing-store-limit');
+app.commandLine.appendSwitch('disable-dev-shm-usage');
 app.commandLine.appendSwitch('renderer-process-limit', '1');
 app.commandLine.appendSwitch('js-flags', '--max-old-space-size=192 --optimize-for-size');
-app.commandLine.appendSwitch('disable-dev-shm-usage');  // critical for low RAM
-app.commandLine.appendSwitch('no-sandbox');
-app.commandLine.appendSwitch('single-process'); // reduces memory overhead
+// NOTE: --single-process and --no-sandbox are intentionally omitted —
+// they crash on Windows 11 with modern Electron security policies.
 
 // ─── Config ─────────────────────────────────────────────────────────────────
 let mainWindow = null;

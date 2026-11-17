@@ -1,6 +1,6 @@
 {
   "name": "sheetapp",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "SheetApp - Compliant Google Sheets & WhatsApp Batch Automation Platform",
   "main": "electron/main.js",
   "type": "commonjs",
@@ -63,7 +63,10 @@
       "shortcutName": "SheetApp",
       "installerIcon": "build/icon.ico",
       "installerHeaderIcon": "build/icon.ico",
-      "deleteAppDataOnUninstall": false
+      "deleteAppDataOnUninstall": false,
+      "perMachine": false,
+      "allowElevation": true,
+      "runAfterFinish": true
     },
     "portable": {
       "artifactName": "${productName}-${version}-Portable-${arch}.${ext}"
