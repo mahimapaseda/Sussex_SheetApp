@@ -12,6 +12,8 @@ let appState = {
   selectedBranchFilter: 'ALL',
   rosterRecords: [],
   attachedImage: null,
+  templates: [],
+  activeTemplateId: null,
   pollingTimer: null
 };
 
@@ -91,11 +93,14 @@ const els = {
   // Tabs
   tabBtnRoster: $('tabBtnRoster'),
   tabBtnTemplate: $('tabBtnTemplate'),
+  tabBtnSavedTemplates: $('tabBtnSavedTemplates'),
   tabBtnLedger: $('tabBtnLedger'),
   tabPanelRoster: $('tabPanelRoster'),
   tabPanelTemplate: $('tabPanelTemplate'),
+  tabPanelSavedTemplates: $('tabPanelSavedTemplates'),
   tabPanelLedger: $('tabPanelLedger'),
   badgeRosterCount: $('badgeRosterCount'),
+  badgeSavedTemplatesCount: $('badgeSavedTemplatesCount'),
   badgeLedgerCount: $('badgeLedgerCount'),
 
   // Roster Tab
@@ -118,6 +123,24 @@ const els = {
   displayEstimatedTime: $('displayEstimatedTime'),
   btnSaveTemplateControls: $('btnSaveTemplateControls'),
   saveTemplateSuccessIndicator: $('saveTemplateSuccessIndicator'),
+  activeTemplateBadgePill: $('activeTemplateBadgePill'),
+  activeTemplateNameLabel: $('activeTemplateNameLabel'),
+  btnSaveAsNewTemplatePreset: $('btnSaveAsNewTemplatePreset'),
+
+  // Saved Templates Tab
+  savedTemplatesListContainer: $('savedTemplatesListContainer'),
+  btnCreateNewTemplatePreset: $('btnCreateNewTemplatePreset'),
+
+  // Template Preset Modal
+  templatePresetModal: $('templatePresetModal'),
+  closeTemplatePresetModalBtn: $('closeTemplatePresetModalBtn'),
+  cancelTemplatePresetBtn: $('cancelTemplatePresetBtn'),
+  templatePresetForm: $('templatePresetForm'),
+  templatePresetFormId: $('templatePresetFormId'),
+  templatePresetNameInput: $('templatePresetNameInput'),
+  templatePresetMakeActiveCheckbox: $('templatePresetMakeActiveCheckbox'),
+  templatePresetModalTitle: $('templatePresetModalTitle'),
+  submitTemplatePresetBtn: $('submitTemplatePresetBtn'),
 
   // Ledger Tab
   ledgerRowsContainer: $('ledgerRowsContainer'),
@@ -271,7 +294,15 @@ function bindEvents() {
   // Tabs
   els.tabBtnRoster?.addEventListener('click', () => switchTab('roster'));
   els.tabBtnTemplate?.addEventListener('click', () => switchTab('template'));
+  els.tabBtnSavedTemplates?.addEventListener('click', () => switchTab('saved-templates'));
   els.tabBtnLedger?.addEventListener('click', () => switchTab('ledger'));
+
+  // Template Preset Modal & Action Buttons
+  els.btnSaveAsNewTemplatePreset?.addEventListener('click', () => openTemplatePresetModal('create-from-controls'));
+  els.btnCreateNewTemplatePreset?.addEventListener('click', () => openTemplatePresetModal('create-blank'));
+  els.closeTemplatePresetModalBtn?.addEventListener('click', closeTemplatePresetModal);
+  els.cancelTemplatePresetBtn?.addEventListener('click', closeTemplatePresetModal);
+  els.templatePresetForm?.addEventListener('submit', handleSaveTemplatePreset);
 
   // Quick navigation buttons
   els.openTemplateModalBtn?.addEventListener('click', () => switchTab('template'));
@@ -438,6 +469,7 @@ function switchTab(tabKey) {
   const tabs = [
     { key: 'roster', btn: els.tabBtnRoster, panel: els.tabPanelRoster },
     { key: 'template', btn: els.tabBtnTemplate, panel: els.tabPanelTemplate },
+    { key: 'saved-templates', btn: els.tabBtnSavedTemplates, panel: els.tabPanelSavedTemplates },
     { key: 'ledger', btn: els.tabBtnLedger, panel: els.tabPanelLedger }
   ];
 
@@ -453,12 +485,20 @@ function switchTab(tabKey) {
     }
   });
 
+  if (tabKey === 'saved-templates') loadTemplates();
   if (tabKey === 'ledger') loadLedgerLogs();
 }
 
 // Initial Data Loader
 async function loadAll() {
-  await Promise.all([fetchStatus(), loadBranches(), loadSheets(false), loadSettingsData(), loadAttachedImageData()]);
+  await Promise.all([
+    fetchStatus(),
+    loadBranches(),
+    loadSheets(false),
+    loadSettingsData(),
+    loadAttachedImageData(),
+    loadTemplates()
+  ]);
 }
 
 async function fetchStatus() {
@@ -1214,22 +1254,33 @@ async function loadSettingsData() {
     if (els.inputGoogleSheetTab) els.inputGoogleSheetTab.value = s.googleSheetTab || 'Sheet1';
     if (els.inputCountryCode) els.inputCountryCode.value = s.defaultCountryCode || '94';
     if (els.inputDailyLimit) els.inputDailyLimit.value = s.dailyLimit || 250;
-    if (els.mainTemplateTextarea && s.messageTemplate) {
+    if (els.mainTemplateTextarea && s.messageTemplate !== undefined) {
       els.mainTemplateTextarea.value = s.messageTemplate;
     }
-    if (els.sliderBatchSize && s.batchSize) {
+    if (els.sliderBatchSize && s.batchSize !== undefined) {
       els.sliderBatchSize.value = s.batchSize;
       if (els.displayBatchSize) els.displayBatchSize.textContent = `${s.batchSize} recipients`;
     }
-    if (els.inputPacingMin && s.minDelaySeconds) els.inputPacingMin.value = s.minDelaySeconds;
-    if (els.inputPacingMax && s.maxDelaySeconds) els.inputPacingMax.value = s.maxDelaySeconds;
+    if (els.inputPacingMin && s.minDelaySeconds !== undefined) els.inputPacingMin.value = s.minDelaySeconds;
+    if (els.inputPacingMax && s.maxDelaySeconds !== undefined) els.inputPacingMax.value = s.maxDelaySeconds;
     if (els.displayPacingDelay && s.minDelaySeconds && s.maxDelaySeconds) {
       els.displayPacingDelay.textContent = `${s.minDelaySeconds} - ${s.maxDelaySeconds}s`;
     }
-    if (els.sliderCooldown && s.cooldownMinutes) {
+    if (els.sliderCooldown && s.cooldownMinutes !== undefined) {
       els.sliderCooldown.value = s.cooldownMinutes;
       if (els.displayCooldown) els.displayCooldown.textContent = `${s.cooldownMinutes} minutes`;
     }
+
+    if (s.activeTemplateId) {
+      appState.activeTemplateId = s.activeTemplateId;
+      if (Array.isArray(s.savedTemplates)) {
+        const active = s.savedTemplates.find(t => t.id === s.activeTemplateId);
+        if (active && els.activeTemplateNameLabel) {
+          els.activeTemplateNameLabel.textContent = active.name;
+        }
+      }
+    }
+
     updateTemplateLivePreview();
   } catch (e) {}
 }
@@ -1262,8 +1313,8 @@ async function saveTemplateAndLimits() {
           els.saveTemplateSuccessIndicator?.classList.add('hidden');
         }, 3000);
       }
-      showToast('Template and Anti-Ban pacing saved successfully!', 'success');
-      fetchStatus();
+      showToast('Template & Anti-Ban changes saved directly to active template!', 'success');
+      await Promise.all([fetchStatus(), loadTemplates()]);
       updateTemplateLivePreview();
     } else {
       showToast('Failed to save settings', 'error');
@@ -1301,6 +1352,386 @@ async function saveSettingsConfig() {
     }
   } catch (e) {
     showToast('Failed to save settings', 'error');
+  }
+}
+
+// ==========================================
+// Saved Templates Management Module
+// Only ONE template may be enabled at a time.
+// Changes in Template Controls automatically save to the active template.
+// ==========================================
+
+let currentTemplateModalMode = 'create-from-controls'; // 'create-from-controls' | 'create-blank' | 'rename'
+let currentTemplateEditId = null;
+
+async function loadTemplates() {
+  try {
+    const res = await fetch('/api/templates');
+    const data = await res.json();
+    const templates = data.templates || [];
+    const activeId = data.activeTemplateId;
+    appState.templates = templates;
+    appState.activeTemplateId = activeId;
+
+    if (els.badgeSavedTemplatesCount) {
+      els.badgeSavedTemplatesCount.textContent = templates.length;
+    }
+
+    const activeTemplate = templates.find(t => t.id === activeId || t.enabled);
+    if (activeTemplate && els.activeTemplateNameLabel) {
+      els.activeTemplateNameLabel.textContent = activeTemplate.name;
+    }
+
+    renderSavedTemplates(templates, activeId);
+  } catch (e) {
+    console.error('Failed to load templates:', e);
+  }
+}
+
+function renderSavedTemplates(templates, activeId) {
+  if (!els.savedTemplatesListContainer) return;
+
+  if (!templates || templates.length === 0) {
+    els.savedTemplatesListContainer.innerHTML = `
+      <div class="col-span-full py-12 text-center">
+        <div class="h-14 w-14 rounded-3xl bg-[var(--bg-toolbar)] text-[var(--text-muted)] flex items-center justify-center text-2xl mx-auto mb-3 shadow-inner">
+          <i class="fa-solid fa-layer-group"></i>
+        </div>
+        <h3 class="font-display font-bold text-sm text-[var(--text-primary)]">No Saved Templates</h3>
+        <p class="text-xs text-[var(--text-muted)] mt-1">Create your first template preset to quickly toggle campaign messages and limits.</p>
+        <button type="button" class="mt-4 btn-primary px-4 py-2 rounded-full text-xs font-bold inline-flex items-center gap-1.5 shadow-sm" onclick="openTemplatePresetModal('create-blank')">
+          <i class="fa-solid fa-plus text-[10px]"></i>
+          <span>Create Template</span>
+        </button>
+      </div>
+    `;
+    return;
+  }
+
+  els.savedTemplatesListContainer.innerHTML = templates.map(t => {
+    const isActive = (t.id === activeId || !!t.enabled);
+    const hasImage = !!(t.attachedImage && (t.attachedImage.dataUrl || t.attachedImage.url));
+    const flyerName = hasImage ? (t.attachedImage.fileName || 'Flyer Attached') : null;
+
+    return `
+      <div class="card-bento p-4 rounded-2xl border transition-all duration-300 flex flex-col justify-between relative group ${
+        isActive
+          ? 'border-emerald-500/50 bg-emerald-500/[0.04] dark:bg-emerald-500/[0.06] shadow-[0_8px_24px_rgba(16,185,129,0.12)] ring-1 ring-emerald-500/20'
+          : 'border-[var(--border-hairline)] hover:border-[#1B365D]/40 dark:hover:border-blue-400/30'
+      }">
+        <!-- Top Row: Name, Status & Menu -->
+        <div>
+          <div class="flex items-center justify-between gap-2 mb-2">
+            <div class="flex items-center gap-2 min-w-0">
+              ${
+                isActive
+                  ? `<span class="shrink-0 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-300/80 dark:border-emerald-700/80 flex items-center gap-1 shadow-sm">
+                      <i class="fa-solid fa-circle-check text-[9px] text-emerald-600 dark:text-emerald-400"></i>
+                      <span>ACTIVE</span>
+                     </span>`
+                  : `<button type="button" class="btn-enable-template shrink-0 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-[var(--bg-toolbar)] text-[var(--text-secondary)] hover:bg-[#1B365D] hover:text-white dark:hover:bg-blue-600 dark:hover:text-white transition border border-[var(--border-hairline)] flex items-center gap-1 shadow-sm cursor-pointer" data-id="${t.id}" title="Enable this template as the active campaign preset (only one enabled at a time)">
+                      <i class="fa-regular fa-circle text-[9px]"></i>
+                      <span>Enable</span>
+                     </button>`
+              }
+              <h4 class="font-display font-bold text-sm text-[var(--text-primary)] truncate" title="${escapeHtml(t.name)}">
+                ${escapeHtml(t.name)}
+              </h4>
+            </div>
+
+            <!-- Quick Action Icons -->
+            <div class="flex items-center gap-1 shrink-0">
+              <button type="button" class="btn-rename-template h-7 w-7 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[#1B365D] dark:hover:text-white hover:bg-[var(--bg-toolbar)] transition text-xs" data-id="${t.id}" title="Rename Template">
+                <i class="fa-solid fa-pen text-[10px]"></i>
+              </button>
+              <button type="button" class="btn-duplicate-template h-7 w-7 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[#1B365D] dark:hover:text-white hover:bg-[var(--bg-toolbar)] transition text-xs" data-id="${t.id}" title="Duplicate Preset">
+                <i class="fa-solid fa-copy text-[10px]"></i>
+              </button>
+              ${
+                !isActive
+                  ? `<button type="button" class="btn-delete-template h-7 w-7 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition text-xs" data-id="${t.id}" title="Delete Preset">
+                      <i class="fa-regular fa-trash-can text-[10px]"></i>
+                     </button>`
+                  : ''
+              }
+            </div>
+          </div>
+
+          <!-- Message Preview Box -->
+          <div class="bg-[var(--bg-panel)] rounded-xl p-3 text-xs font-mono text-[var(--text-secondary)] line-clamp-3 leading-relaxed border border-[var(--border-hairline)] select-text mb-3">
+            ${escapeHtml(t.messageTemplate || '(Empty message template)')}
+          </div>
+
+          <!-- Attached Flyer Badge (if any) -->
+          ${
+            hasImage
+              ? `<div class="mb-3 flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200/60 dark:border-blue-900/60 text-[11px] font-semibold text-blue-800 dark:text-blue-300">
+                  <i class="fa-solid fa-image text-[10px]"></i>
+                  <span class="truncate flex-1">${escapeHtml(flyerName)}</span>
+                  <span class="text-[9.5px] px-1.5 py-0.2 rounded font-bold ${t.attachedImage?.enabled ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300' : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'}">${t.attachedImage?.enabled ? 'Enabled' : 'Disabled'}</span>
+                 </div>`
+              : ''
+          }
+        </div>
+
+        <!-- Bottom Controls & Pacing Stats Strip -->
+        <div class="pt-3 border-t border-[var(--border-hairline)] space-y-2.5">
+          <!-- Pacing Badges -->
+          <div class="flex items-center justify-between text-[10.5px] font-mono text-[var(--text-muted)] gap-1">
+            <span class="flex items-center gap-1" title="Batch Chunk Size">
+              <i class="fa-solid fa-cubes text-[9.5px] text-[#1B365D] dark:text-blue-400"></i>
+              <span>${t.batchSize || 15}/chunk</span>
+            </span>
+            <span class="flex items-center gap-1" title="Pacing Jitter Delay">
+              <i class="fa-solid fa-stopwatch text-[9.5px] text-amber-500"></i>
+              <span>${t.minDelaySeconds || 12}-${t.maxDelaySeconds || 22}s</span>
+            </span>
+            <span class="flex items-center gap-1" title="Cooldown Pause">
+              <i class="fa-solid fa-hourglass-half text-[9.5px] text-blue-500"></i>
+              <span>${t.cooldownMinutes || 3}m cool</span>
+            </span>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="flex items-center gap-2">
+            <button type="button" class="btn-edit-template flex-1 btn-neutral py-1.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer" data-id="${t.id}" title="Edit this template in Template & Anti-Ban Controls">
+              <i class="fa-solid fa-sliders text-[10px]"></i>
+              <span>Edit in Controls</span>
+            </button>
+            ${
+              !isActive
+                ? `<button type="button" class="btn-enable-template btn-primary py-1.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer shadow-sm" data-id="${t.id}">
+                    <i class="fa-solid fa-check text-[10px]"></i>
+                    <span>Activate</span>
+                   </button>`
+                : `<span class="py-1.5 px-3 rounded-xl text-xs font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 flex items-center gap-1 shadow-sm">
+                    <i class="fa-solid fa-bolt text-[10px]"></i>
+                    <span>Active Preset</span>
+                   </span>`
+            }
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // Attach Event Listeners
+  els.savedTemplatesListContainer.querySelectorAll('.btn-enable-template').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = btn.getAttribute('data-id');
+      if (id) enableTemplatePreset(id);
+    });
+  });
+
+  els.savedTemplatesListContainer.querySelectorAll('.btn-edit-template').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = btn.getAttribute('data-id');
+      if (id) loadTemplateIntoControls(id);
+    });
+  });
+
+  els.savedTemplatesListContainer.querySelectorAll('.btn-duplicate-template').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = btn.getAttribute('data-id');
+      if (id) duplicateTemplatePreset(id);
+    });
+  });
+
+  els.savedTemplatesListContainer.querySelectorAll('.btn-rename-template').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = btn.getAttribute('data-id');
+      const t = templates.find(item => item.id === id);
+      if (t) openTemplatePresetModal('rename', t);
+    });
+  });
+
+  els.savedTemplatesListContainer.querySelectorAll('.btn-delete-template').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = btn.getAttribute('data-id');
+      if (id) deleteTemplatePreset(id);
+    });
+  });
+}
+
+async function enableTemplatePreset(templateId, showFeedback = true) {
+  try {
+    const res = await fetch(`/api/templates/${templateId}/enable`, {
+      method: 'POST'
+    });
+    const data = await res.json();
+    if (data.success) {
+      if (showFeedback) {
+        showToast(`Template "${data.activeTemplate?.name || 'Preset'}" is now Active!`, 'success');
+      }
+      await Promise.all([
+        loadTemplates(),
+        loadSettingsData(),
+        loadAttachedImageData(),
+        fetchStatus()
+      ]);
+    } else {
+      showToast(data.error || 'Failed to enable template', 'error');
+    }
+  } catch (err) {
+    showToast('Failed to activate template', 'error');
+  }
+}
+
+async function loadTemplateIntoControls(templateId) {
+  if (appState.activeTemplateId !== templateId) {
+    await enableTemplatePreset(templateId, false);
+  }
+  switchTab('template');
+  showToast('Template loaded into Controls for live editing.', 'info');
+}
+
+async function duplicateTemplatePreset(templateId) {
+  try {
+    const res = await fetch(`/api/templates/${templateId}/duplicate`, {
+      method: 'POST'
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast(`Duplicated "${data.template?.name}"`, 'success');
+      await loadTemplates();
+    } else {
+      showToast(data.error || 'Failed to duplicate template', 'error');
+    }
+  } catch (err) {
+    showToast('Failed to duplicate template', 'error');
+  }
+}
+
+async function deleteTemplatePreset(templateId) {
+  const t = appState.templates.find(item => item.id === templateId);
+  if (!t) return;
+  if (t.enabled || t.id === appState.activeTemplateId) {
+    showToast('Cannot delete the active template. Please enable another template first.', 'warning');
+    return;
+  }
+  if (!confirm(`Are you sure you want to delete template "${t.name}"?`)) {
+    return;
+  }
+  try {
+    const res = await fetch(`/api/templates/${templateId}`, {
+      method: 'DELETE'
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast('Template preset deleted', 'info');
+      await loadTemplates();
+    } else {
+      showToast(data.error || 'Failed to delete template', 'error');
+    }
+  } catch (err) {
+    showToast('Failed to delete template', 'error');
+  }
+}
+
+function openTemplatePresetModal(mode = 'create-from-controls', existingTemplate = null) {
+  currentTemplateModalMode = mode;
+  currentTemplateEditId = existingTemplate ? existingTemplate.id : null;
+  if (!els.templatePresetModal) return;
+
+  if (els.templatePresetFormId) els.templatePresetFormId.value = currentTemplateEditId || '';
+
+  if (mode === 'rename') {
+    if (els.templatePresetModalTitle) els.templatePresetModalTitle.textContent = 'Rename Template Preset';
+    if (els.templatePresetNameInput) els.templatePresetNameInput.value = existingTemplate ? existingTemplate.name : '';
+    if (els.templatePresetMakeActiveCheckbox) {
+      els.templatePresetMakeActiveCheckbox.closest('label')?.classList.add('hidden');
+    }
+  } else if (mode === 'create-from-controls') {
+    if (els.templatePresetModalTitle) els.templatePresetModalTitle.textContent = 'Save as New Template Preset';
+    const activeName = els.activeTemplateNameLabel?.textContent || 'Current';
+    if (els.templatePresetNameInput) els.templatePresetNameInput.value = `${activeName} (Copy)`;
+    if (els.templatePresetMakeActiveCheckbox) {
+      els.templatePresetMakeActiveCheckbox.closest('label')?.classList.remove('hidden');
+      els.templatePresetMakeActiveCheckbox.checked = true;
+    }
+  } else {
+    // create-blank
+    if (els.templatePresetModalTitle) els.templatePresetModalTitle.textContent = 'Create New Template Preset';
+    if (els.templatePresetNameInput) els.templatePresetNameInput.value = '';
+    if (els.templatePresetMakeActiveCheckbox) {
+      els.templatePresetMakeActiveCheckbox.closest('label')?.classList.remove('hidden');
+      els.templatePresetMakeActiveCheckbox.checked = false;
+    }
+  }
+
+  els.templatePresetModal.classList.remove('hidden');
+  els.templatePresetNameInput?.focus();
+  els.templatePresetNameInput?.select();
+}
+
+// Make accessible for inline onclick
+window.openTemplatePresetModal = openTemplatePresetModal;
+
+function closeTemplatePresetModal() {
+  els.templatePresetModal?.classList.add('hidden');
+  if (els.templatePresetNameInput) els.templatePresetNameInput.value = '';
+  currentTemplateModalMode = 'create-from-controls';
+  currentTemplateEditId = null;
+}
+
+async function handleSaveTemplatePreset(e) {
+  e.preventDefault();
+  const name = els.templatePresetNameInput?.value.trim();
+  if (!name) return;
+
+  try {
+    if (currentTemplateModalMode === 'rename' && currentTemplateEditId) {
+      const res = await fetch(`/api/templates/${currentTemplateEditId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('Template renamed successfully', 'success');
+      } else {
+        showToast(data.error || 'Failed to rename template', 'error');
+      }
+    } else {
+      const isFromControls = (currentTemplateModalMode === 'create-from-controls');
+      const payload = {
+        name,
+        messageTemplate: isFromControls ? (els.mainTemplateTextarea?.value || '') : 'Hello {Name}, this is an update.',
+        batchSize: isFromControls ? parseInt(els.sliderBatchSize?.value || 15, 10) : 15,
+        minDelaySeconds: isFromControls ? parseInt(els.inputPacingMin?.value || 12, 10) : 12,
+        maxDelaySeconds: isFromControls ? parseInt(els.inputPacingMax?.value || 22, 10) : 22,
+        cooldownMinutes: isFromControls ? parseInt(els.sliderCooldown?.value || 3, 10) : 3,
+        attachedImage: isFromControls ? (appState.attachedImage || null) : null,
+        enabled: !!els.templatePresetMakeActiveCheckbox?.checked
+      };
+
+      const res = await fetch('/api/templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(`Template "${name}" created!`, 'success');
+        if (data.template?.enabled) {
+          await loadSettingsData();
+          await loadAttachedImageData();
+          fetchStatus();
+        }
+      } else {
+        showToast(data.error || 'Failed to create template', 'error');
+      }
+    }
+
+    closeTemplatePresetModal();
+    await loadTemplates();
+  } catch (err) {
+    showToast('Failed to save template preset', 'error');
   }
 }
 

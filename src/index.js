@@ -42,14 +42,65 @@ app.get('/api/status', (req, res) => {
   });
 });
 
-// 2. Settings & Branch APIs
+// 2. Settings, Saved Templates & Branch APIs
 app.get('/api/settings', (req, res) => {
   res.json(settings.loadSettings());
 });
 
 app.post('/api/settings', (req, res) => {
-  const updated = settings.saveSettings(req.body);
-  res.json({ success: !!updated, settings: updated });
+  const result = settings.saveActiveTemplateFromControls(req.body);
+  res.json({ success: !!result, settings: result.settings, activeTemplate: result.activeTemplate });
+});
+
+// Saved Templates APIs (Exactly ONE enabled at a time)
+app.get('/api/templates', (req, res) => {
+  const result = settings.getTemplates();
+  res.json({ success: true, ...result });
+});
+
+app.post('/api/templates', (req, res) => {
+  try {
+    const tpl = settings.addTemplate(req.body);
+    res.json({ success: true, template: tpl });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+app.put('/api/templates/:id', (req, res) => {
+  try {
+    const tpl = settings.updateTemplate(req.params.id, req.body);
+    res.json({ success: true, template: tpl });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/templates/:id/enable', (req, res) => {
+  try {
+    const tpl = settings.enableTemplate(req.params.id);
+    res.json({ success: true, template: tpl, activeTemplate: tpl });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/templates/:id/duplicate', (req, res) => {
+  try {
+    const tpl = settings.duplicateTemplate(req.params.id);
+    res.json({ success: true, template: tpl });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+app.delete('/api/templates/:id', (req, res) => {
+  try {
+    settings.deleteTemplate(req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
 });
 
 app.get('/api/branches', (req, res) => {

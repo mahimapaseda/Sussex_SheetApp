@@ -130,6 +130,76 @@ async function run() {
   assert.strictEqual(imgDeleteRes.body.image.enabled, false);
   console.log('  ✓ DELETE /api/template/image clears attached flyer asset');
 
+  // Test 6: Saved Templates & Single-Active Preset Invariant
+  const templatesRes = await get('/api/templates');
+  assert.strictEqual(templatesRes.status, 200);
+  assert.strictEqual(templatesRes.body.success, true);
+  assert.ok(Array.isArray(templatesRes.body.templates));
+  assert.ok(templatesRes.body.templates.length >= 1);
+  const enabledCount1 = templatesRes.body.templates.filter(t => t.enabled).length;
+  assert.strictEqual(enabledCount1, 1, 'Strictly ONE template must be enabled');
+  console.log('  ✓ GET /api/templates returns templates with exactly 1 enabled');
+
+  // Create a new template preset
+  const newTemplateRes = await post('/api/templates', {
+    name: 'Fee Reminder Notice',
+    messageTemplate: 'Dear {Name}, please note the term fee deadline.',
+    batchSize: 20,
+    minDelaySeconds: 15,
+    maxDelaySeconds: 25,
+    cooldownMinutes: 4,
+    enabled: false
+  });
+  assert.strictEqual(newTemplateRes.status, 200);
+  assert.strictEqual(newTemplateRes.body.success, true);
+  const createdId = newTemplateRes.body.template.id;
+  assert.strictEqual(newTemplateRes.body.template.name, 'Fee Reminder Notice');
+  console.log('  ✓ POST /api/templates creates new template preset');
+
+  // Enable the newly created template preset
+  const enableRes = await post(`/api/templates/${createdId}/enable`, {});
+  assert.strictEqual(enableRes.status, 200);
+  assert.strictEqual(enableRes.body.success, true);
+  assert.strictEqual(enableRes.body.activeTemplate.id, createdId);
+  assert.strictEqual(enableRes.body.activeTemplate.enabled, true);
+
+  // Check templates list again - strictly ONLY createdId is enabled
+  const checkTemplates = await get('/api/templates');
+  const enabledList = checkTemplates.body.templates.filter(t => t.enabled);
+  assert.strictEqual(enabledList.length, 1, 'Only one template can be enabled');
+  assert.strictEqual(enabledList[0].id, createdId, 'The enabled template must be createdId');
+  console.log('  ✓ POST /api/templates/:id/enable enforces only one active template invariant');
+
+  // Verify settings were updated to match newly enabled template
+  const settingsRes2 = await get('/api/settings');
+  assert.strictEqual(settingsRes2.body.messageTemplate, 'Dear {Name}, please note the term fee deadline.');
+  assert.strictEqual(settingsRes2.body.batchSize, 20);
+  assert.strictEqual(settingsRes2.body.minDelaySeconds, 15);
+  console.log('  ✓ Settings immediately updated from newly enabled template');
+
+  // Test updating template via Template & Anti-Ban Controls
+  await post('/api/settings', {
+    messageTemplate: 'Updated: Dear {Name}, your invoice is ready.',
+    batchSize: 18,
+    minDelaySeconds: 14,
+    maxDelaySeconds: 24,
+    cooldownMinutes: 5
+  });
+
+  const checkUpdated = await get('/api/templates');
+  const updatedActive = checkUpdated.body.templates.find(t => t.id === createdId);
+  assert.strictEqual(updatedActive.messageTemplate, 'Updated: Dear {Name}, your invoice is ready.');
+  assert.strictEqual(updatedActive.batchSize, 18);
+  console.log('  ✓ POST /api/settings saves controls changes directly into the active template');
+
+  // Clean up: Switch back to first template and delete test template
+  const firstId = checkUpdated.body.templates.find(t => t.id !== createdId).id;
+  await post(`/api/templates/${firstId}/enable`, {});
+  const delTemplateRes = await del(`/api/templates/${createdId}`);
+  assert.strictEqual(delTemplateRes.status, 200);
+  assert.strictEqual(delTemplateRes.body.success, true);
+  console.log('  ✓ DELETE /api/templates/:id removes non-active template cleanly');
+
   console.log('\n==============================================');
   console.log('  API INTEGRATION VERIFICATION PASSED!        ');
   console.log('==============================================');
