@@ -36,7 +36,7 @@ app.get('/api/status', (req, res) => {
 
   res.json({
     appName: 'SheetApp',
-    version: '1.3.1',
+    version: '1.3.2',
     whatsapp: wa,
     batch,
     settings: userSettings
@@ -97,8 +97,8 @@ app.post('/api/templates/:id/duplicate', (req, res) => {
 
 app.delete('/api/templates/:id', (req, res) => {
   try {
-    settings.deleteTemplate(req.params.id);
-    res.json({ success: true });
+    const result = settings.deleteTemplate(req.params.id);
+    res.json({ success: true, ...(typeof result === 'object' ? result : {}) });
   } catch (err) {
     res.status(400).json({ success: false, error: err.message });
   }

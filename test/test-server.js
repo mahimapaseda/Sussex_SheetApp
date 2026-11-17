@@ -200,6 +200,16 @@ async function run() {
   assert.strictEqual(delTemplateRes.body.success, true);
   console.log('  ✓ DELETE /api/templates/:id removes non-active template cleanly');
 
+  // Verify deleting the only remaining template safely resets to a fresh default template
+  const resetDelRes = await del(`/api/templates/${firstId}`);
+  assert.strictEqual(resetDelRes.status, 200);
+  assert.strictEqual(resetDelRes.body.success, true);
+  assert.strictEqual(resetDelRes.body.resetToDefault, true);
+  const afterResetTemplates = await get('/api/templates');
+  assert.strictEqual(afterResetTemplates.body.templates.length, 1);
+  assert.strictEqual(afterResetTemplates.body.templates[0].enabled, true);
+  console.log('  ✓ DELETE /api/templates/:id on single active template safely resets to default preset');
+
   // Test 7: Google OAuth Status & Auth URL Generation
   const googleStatusRes = await get('/api/auth/google/status');
   assert.strictEqual(googleStatusRes.status, 200);

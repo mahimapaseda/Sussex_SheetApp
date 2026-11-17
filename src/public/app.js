@@ -1559,13 +1559,9 @@ function renderSavedTemplates(templates, activeId) {
               <button type="button" class="btn-duplicate-template h-7 w-7 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[#1B365D] dark:hover:text-white hover:bg-[var(--bg-toolbar)] transition text-xs" data-id="${t.id}" title="Duplicate Preset">
                 <i class="fa-solid fa-copy text-[10px]"></i>
               </button>
-              ${
-                !isActive
-                  ? `<button type="button" class="btn-delete-template h-7 w-7 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition text-xs" data-id="${t.id}" title="Delete Preset">
-                      <i class="fa-regular fa-trash-can text-[10px]"></i>
-                     </button>`
-                  : ''
-              }
+              <button type="button" class="btn-delete-template h-7 w-7 rounded-lg flex items-center justify-center text-red-500 hover:text-red-700 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition text-xs" data-id="${t.id}" title="Delete Preset">
+                <i class="fa-regular fa-trash-can text-[10px]"></i>
+              </button>
             </div>
           </div>
 
@@ -1722,21 +1718,33 @@ async function duplicateTemplatePreset(templateId) {
 async function deleteTemplatePreset(templateId) {
   const t = appState.templates.find(item => item.id === templateId);
   if (!t) return;
-  if (t.enabled || t.id === appState.activeTemplateId) {
-    showToast('Cannot delete the active template. Please enable another template first.', 'warning');
+
+  const isOnlyTemplate = (appState.templates.length <= 1);
+  const confirmMsg = isOnlyTemplate
+    ? `Delete "${t.name}"? This is your only template preset, so it will be reset to a clean default template.`
+    : `Are you sure you want to delete template "${t.name}"?`;
+
+  if (!confirm(confirmMsg)) {
     return;
   }
-  if (!confirm(`Are you sure you want to delete template "${t.name}"?`)) {
-    return;
-  }
+
   try {
     const res = await fetch(`/api/templates/${templateId}`, {
       method: 'DELETE'
     });
     const data = await res.json();
     if (data.success) {
-      showToast('Template preset deleted', 'info');
-      await loadTemplates();
+      if (data.resetToDefault) {
+        showToast('Template reset to clean default preset.', 'info');
+      } else {
+        showToast(`Template "${t.name}" deleted.`, 'info');
+      }
+      await Promise.all([
+        loadTemplates(),
+        loadSettingsData(),
+        loadAttachedImageData(),
+        fetchStatus()
+      ]);
     } else {
       showToast(data.error || 'Failed to delete template', 'error');
     }

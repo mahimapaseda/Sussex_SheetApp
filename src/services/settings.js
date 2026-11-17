@@ -398,12 +398,41 @@ function duplicateTemplate(id) {
 
 function deleteTemplate(id) {
   const current = loadSettings();
-  if (current.savedTemplates.length <= 1) {
-    throw new Error('Cannot delete the only template.');
-  }
-
   const target = current.savedTemplates.find(t => t.id === id);
   if (!target) throw new Error('Template not found');
+
+  if (current.savedTemplates.length <= 1) {
+    // Reset to a clean fresh default template
+    current.savedTemplates = [
+      {
+        id: DEFAULT_TEMPLATE_ID,
+        name: 'Default Broadcast',
+        messageTemplate: 'Hello {Name}, this is an automated update regarding your record. Please let us know if you need any assistance!\n\nBest regards',
+        attachedImage: {
+          enabled: false,
+          fileName: '',
+          originalName: '',
+          path: '',
+          url: ''
+        },
+        batchSize: 15,
+        minDelaySeconds: 12,
+        maxDelaySeconds: 22,
+        cooldownMinutes: 3,
+        enabled: true,
+        updatedAt: new Date().toISOString()
+      }
+    ];
+    current.activeTemplateId = DEFAULT_TEMPLATE_ID;
+    current.messageTemplate = current.savedTemplates[0].messageTemplate;
+    current.attachedImage = { ...current.savedTemplates[0].attachedImage };
+    current.batchSize = current.savedTemplates[0].batchSize;
+    current.minDelaySeconds = current.savedTemplates[0].minDelaySeconds;
+    current.maxDelaySeconds = current.savedTemplates[0].maxDelaySeconds;
+    current.cooldownMinutes = current.savedTemplates[0].cooldownMinutes;
+    saveSettings(current);
+    return { success: true, resetToDefault: true };
+  }
 
   const wasEnabled = target.enabled;
   current.savedTemplates = current.savedTemplates.filter(t => t.id !== id);
@@ -421,7 +450,7 @@ function deleteTemplate(id) {
   }
 
   saveSettings(current);
-  return true;
+  return { success: true, wasActive: wasEnabled };
 }
 
 module.exports = {
