@@ -1,6 +1,6 @@
 {
   "name": "sheetapp",
-  "version": "1.1.2",
+  "version": "1.2.0",
   "description": "SheetApp - Compliant Google Sheets & WhatsApp Batch Automation Platform",
   "main": "electron/main.js",
   "type": "commonjs",
@@ -13,28 +13,27 @@
   },
   "build": {
     "electronVersion": "34.2.0",
-    "appId": "lk.mahimapaseda.sheetapp",
+    "appId": "lk.sussex.sheetapp",
     "productName": "SheetApp",
     "copyright": "Copyright (c) 2026 Mahima Paseda | mahimapaseda.lk",
+    "asar": true,
     "directories": {
-      "output": "dist",
-      "buildResources": "build"
+      "output": "dist"
     },
     "files": [
       "electron/**/*",
       "src/**/*",
-      "package.json",
-      "!data/.wwebjs_auth/**",
-      "!data/.wwebjs_cache/**"
+      "data/settings.json",
+      "data/sent_log.json",
+      "data/assets/**/*",
+      "build/icon.ico",
+      "build/icon.png",
+      "package.json"
     ],
     "extraResources": [
       {
-        "from": "data/settings.json",
-        "to": "data/settings.json"
-      },
-      {
-        "from": "data/sent_log.json",
-        "to": "data/sent_log.json"
+        "from": "build/icon.ico",
+        "to": "icon.ico"
       }
     ],
     "win": {
@@ -53,6 +52,7 @@
         }
       ],
       "icon": "build/icon.ico",
+      "requestedExecutionLevel": "asInvoker",
       "artifactName": "${productName}-${version}-Windows-${arch}.${ext}"
     },
     "nsis": {
@@ -64,15 +64,11 @@
       "installerIcon": "build/icon.ico",
       "installerHeaderIcon": "build/icon.ico",
       "deleteAppDataOnUninstall": false,
-      "perMachine": false,
-      "allowElevation": true,
       "runAfterFinish": true
     },
     "portable": {
       "artifactName": "${productName}-${version}-Portable-${arch}.${ext}"
-    },
-    "asar": true,
-    "compression": "maximum"
+    }
   },
   "keywords": [
     "whatsapp",

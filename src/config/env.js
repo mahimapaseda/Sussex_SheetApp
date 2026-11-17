@@ -1,41 +1,71 @@
 const path = require('path');
 const fs = require('fs');
-require('dotenv').config();
+require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
+
+const ROOT_DIR = path.resolve(__dirname, '../../');
 
 const PORT = parseInt(process.env.PORT || '3850', 10);
 const TIMEZONE = process.env.TIMEZONE || 'Asia/Colombo';
 const DEFAULT_COUNTRY_CODE = process.env.DEFAULT_COUNTRY_CODE || '94';
 
-// Use APPDATA on Windows if running in packaged Electron, else local data/
-const isPackaged = process.defaultApp === false || /[\\/]dist[\\/]/.test(__dirname);
-const APPDATA_DIR = process.env.APPDATA 
-  ? path.join(process.env.APPDATA, 'SheetApp') 
-  : path.join(__dirname, '../../data');
+// In packaged electron mode, user data must be written to %APPDATA%/SheetApp
+function resolveDataDir() {
+  if (process.env.APPDATA) {
+    const appDataSheetApp = path.join(process.env.APPDATA, 'SheetApp');
+    if (!fs.existsSync(appDataSheetApp)) {
+      try {
+        fs.mkdirSync(appDataSheetApp, { recursive: true });
+      } catch (e) {
+        // Fallback to local data folder
+      }
+    }
+    return appDataSheetApp;
+  }
+  return path.join(ROOT_DIR, 'data');
+}
 
-const DATA_DIR = isPackaged ? APPDATA_DIR : path.join(__dirname, '../../data');
-const ASSETS_DIR = path.join(DATA_DIR, 'assets');
+const DATA_DIR = resolveDataDir();
+const LOCAL_DATA_DIR = path.join(ROOT_DIR, 'data');
 
-if (!fs.existsSync(DATA_DIR)) {
+// Migrate existing local data files (settings.json, sent_log.json, assets) on first run
+function migrateLocalData() {
+  if (DATA_DIR === LOCAL_DATA_DIR) return;
   try {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-  } catch (e) {
-    console.warn('[Env] Could not create DATA_DIR:', e.message);
+    const filesToMigrate = ['settings.json', 'sent_log.json'];
+    for (const f of filesToMigrate) {
+      const src = path.join(LOCAL_DATA_DIR, f);
+      const dst = path.join(DATA_DIR, f);
+      if (fs.existsSync(src) && !fs.existsSync(dst)) {
+        fs.copyFileSync(src, dst);
+      }
+    }
+
+    const srcAssets = path.join(LOCAL_DATA_DIR, 'assets');
+    const dstAssets = path.join(DATA_DIR, 'assets');
+    if (fs.existsSync(srcAssets) && !fs.existsSync(dstAssets)) {
+      fs.cpSync(srcAssets, dstAssets, { recursive: true });
+    }
+  } catch (err) {
+    console.warn('[Storage] Migration note:', err.message);
   }
 }
 
+migrateLocalData();
+
+// Ensure asset folder exists
+const ASSETS_DIR = path.join(DATA_DIR, 'assets');
 if (!fs.existsSync(ASSETS_DIR)) {
   try {
     fs.mkdirSync(ASSETS_DIR, { recursive: true });
-  } catch (e) {
-    console.warn('[Env] Could not create ASSETS_DIR:', e.message);
-  }
+  } catch (e) {}
 }
 
 module.exports = {
+  ROOT_DIR,
   PORT,
   TIMEZONE,
   DEFAULT_COUNTRY_CODE,
   DATA_DIR,
   ASSETS_DIR,
-  isPackaged
+  isPackaged: DATA_DIR !== LOCAL_DATA_DIR
 };

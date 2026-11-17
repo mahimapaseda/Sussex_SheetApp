@@ -341,10 +341,50 @@ app.delete('/api/ledger', (req, res) => {
 
 // Start Server
 let server = null;
-if (require.main === module) {
-  server = app.listen(config.PORT, () => {
-    console.log(`[SheetApp] Server listening on http://localhost:${config.PORT}`);
+function startServer(port = config.PORT) {
+  if (server && server.listening) return server;
+  server = app.listen(port, () => {
+    console.log(`[SheetApp] Server listening on http://localhost:${port}`);
   });
+  return server;
 }
 
-module.exports = { app, server };
+let backendShutdownPromise = null;
+function shutdownBackend() {
+  if (backendShutdownPromise) return backendShutdownPromise;
+  backendShutdownPromise = (async () => {
+    console.log('[SheetApp] Initiating clean backend shutdown...');
+    try {
+      await whatsappClient.disconnectClient(false);
+    } catch (e) {}
+
+    await new Promise((resolve) => {
+      if (!server || !server.listening) return resolve();
+      const closeTimer = setTimeout(resolve, 1500);
+      try {
+        if (typeof server.closeAllConnections === 'function') {
+          server.closeAllConnections();
+        }
+        server.close(() => {
+          clearTimeout(closeTimer);
+          resolve();
+        });
+      } catch (e) {
+        clearTimeout(closeTimer);
+        resolve();
+      }
+    });
+  })();
+  return backendShutdownPromise;
+}
+
+// Start Server automatically when required or executed directly
+startServer();
+
+// Graceful termination handling
+process.on('SIGINT', () => {
+  console.log('\n[SheetApp] Shutting down gracefully...');
+  shutdownBackend().finally(() => process.exit(0));
+});
+
+module.exports = { app, server, startServer, shutdownBackend };
