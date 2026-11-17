@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Tray, Menu, session, shell } = require('electron');
+const { app, BrowserWindow, Tray, Menu, session, shell, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -30,7 +30,7 @@ let shutdownCompleted = false;
 let quitPromise = null;
 let backendModule = null;
 
-const PORT = process.env.PORT || 3850;
+const PORT = process.env.PORT || 3847;
 
 function startBackendServer() {
   try {
@@ -52,8 +52,10 @@ function getIconPath() {
 
   const ico = path.join(__dirname, '../build/icon.ico');
   const png = path.join(__dirname, '../build/icon.png');
+  const pubPng = path.join(__dirname, '../src/public/favicon.png');
   if (fs.existsSync(ico)) return ico;
   if (fs.existsSync(png)) return png;
+  if (fs.existsSync(pubPng)) return pubPng;
   return null;
 }
 
@@ -66,13 +68,14 @@ function createWindow() {
   }
 
   const iconPath = getIconPath();
+  const winIcon = iconPath ? nativeImage.createFromPath(iconPath) : null;
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 840,
     minWidth: 960,
     minHeight: 640,
     title: 'SheetApp — WhatsApp & Sheets Automation',
-    icon: iconPath,
+    icon: winIcon || iconPath,
     backgroundColor: '#0b0f19',
     show: false, // Don't show until ready-to-show
     webPreferences: {
@@ -81,6 +84,12 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js')
     }
   });
+
+  if (winIcon && !winIcon.isEmpty()) {
+    try {
+      mainWindow.setIcon(winIcon);
+    } catch (e) {}
+  }
 
   mainWindow.setMenuBarVisibility(false);
 

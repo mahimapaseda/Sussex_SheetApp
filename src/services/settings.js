@@ -363,8 +363,16 @@ function updateTemplate(id, templateData) {
     updatedAt: new Date().toISOString()
   };
 
+  if (templateData.enabled) {
+    current.savedTemplates.forEach((t, i) => {
+      t.enabled = (i === idx);
+    });
+    current.activeTemplateId = id;
+    current.savedTemplates[idx].enabled = true;
+  }
+
   // If this template is active, also sync root settings
-  if (existing.enabled) {
+  if (current.savedTemplates[idx].enabled) {
     current.messageTemplate = current.savedTemplates[idx].messageTemplate;
     current.batchSize = current.savedTemplates[idx].batchSize;
     current.minDelaySeconds = current.savedTemplates[idx].minDelaySeconds;

@@ -12,7 +12,7 @@ try {
 const TOKEN_PATH = path.join(config.DATA_DIR, 'google_token.json');
 
 function getRedirectUri() {
-  const currentPort = process.env.PORT || config.PORT || 3850;
+  const currentPort = process.env.PORT || config.PORT || 3847;
   return `http://localhost:${currentPort}/auth/google/callback`;
 }
 
