@@ -43,6 +43,13 @@ function startBackendServer() {
 }
 
 function getIconPath() {
+  try {
+    if (process.resourcesPath) {
+      const resIco = path.join(process.resourcesPath, 'icon.ico');
+      if (fs.existsSync(resIco)) return resIco;
+    }
+  } catch (e) {}
+
   const ico = path.join(__dirname, '../build/icon.ico');
   const png = path.join(__dirname, '../build/icon.png');
   if (fs.existsSync(ico)) return ico;
