@@ -1,8 +1,12 @@
 node_modules/
 dist/
 build/
+!build/icon.ico
+!build/icon.png
 .wwebjs_auth/
 .wwebjs_cache/
+data/.wwebjs_auth/
+data/.wwebjs_cache/
 data/sent_log.json
 .env
 .DS_Store

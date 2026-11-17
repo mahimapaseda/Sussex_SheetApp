@@ -1,6 +1,6 @@
 {
   "name": "sheetapp",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "SheetApp - Compliant Google Sheets & WhatsApp Batch Automation Platform",
   "main": "electron/main.js",
   "type": "commonjs",
@@ -9,7 +9,67 @@
     "dev": "node --watch src/index.js",
     "electron": "electron .",
     "test": "node test/test-batch-engine.js && node test/test-server.js",
-    "build": "electron-builder --win"
+    "build": "electron-builder --win --publish=never"
+  },
+  "build": {
+    "electronVersion": "34.2.0",
+    "appId": "lk.mahimapaseda.sheetapp",
+    "productName": "SheetApp",
+    "copyright": "Copyright (c) 2026 Mahima Paseda | mahimapaseda.lk",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "electron/**/*",
+      "src/**/*",
+      "package.json",
+      "!data/.wwebjs_auth/**",
+      "!data/.wwebjs_cache/**"
+    ],
+    "extraResources": [
+      {
+        "from": "data/settings.json",
+        "to": "data/settings.json"
+      },
+      {
+        "from": "data/sent_log.json",
+        "to": "data/sent_log.json"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "artifactName": "${productName}-${version}-Windows-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "SheetApp",
+      "installerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico",
+      "deleteAppDataOnUninstall": false
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-Portable-${arch}.${ext}"
+    },
+    "asar": true,
+    "compression": "maximum"
   },
   "keywords": [
     "whatsapp",
@@ -19,7 +79,7 @@
     "rate-limiting",
     "sheetapp"
   ],
-  "author": "Sussex Network",
+  "author": "Mahima Paseda | mahimapaseda.lk",
   "license": "ISC",
   "dependencies": {
     "cors": "^2.8.5",
