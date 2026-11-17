@@ -9,20 +9,27 @@ if (!gotTheLock) {
   process.exit(0);
 }
 
-// Low-memory Chromium flags tuned for 4GB RAM Windows PCs
+// Ultra Low-Memory Chromium Flags (Tuned for 2GB-4GB RAM & Dual-Core Windows PCs)
 app.commandLine.appendSwitch('disable-gpu');
+app.commandLine.appendSwitch('disable-gpu-compositing');
 app.commandLine.appendSwitch('disable-software-rasterizer');
 app.commandLine.appendSwitch('disable-background-networking');
+app.commandLine.appendSwitch('disable-background-timer-throttling');
 app.commandLine.appendSwitch('disable-extensions');
 app.commandLine.appendSwitch('disable-sync');
 app.commandLine.appendSwitch('disable-translate');
 app.commandLine.appendSwitch('mute-audio');
 app.commandLine.appendSwitch('aggressive-cache-discard');
-app.commandLine.appendSwitch('disk-cache-size', '10485760');
-app.commandLine.appendSwitch('media-cache-size', '5242880');
-app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion,AudioServiceOutOfProcess,MediaRouter,OptimizationHints');
+app.commandLine.appendSwitch('disable-breakpad');
+app.commandLine.appendSwitch('disable-component-update');
+app.commandLine.appendSwitch('disable-domain-reliability');
+app.commandLine.appendSwitch('disable-client-side-phishing-detection');
+app.commandLine.appendSwitch('disable-default-apps');
+app.commandLine.appendSwitch('disk-cache-size', '5242880');  // 5MB max disk cache
+app.commandLine.appendSwitch('media-cache-size', '2097152'); // 2MB max media cache
+app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion,AudioServiceOutOfProcess,MediaRouter,OptimizationHints,InterestFeedContentSuggestions');
 app.commandLine.appendSwitch('renderer-process-limit', '1');
-app.commandLine.appendSwitch('js-flags', '--max-old-space-size=128 --optimize-for-size');
+app.commandLine.appendSwitch('js-flags', '--max-old-space-size=128 --optimize-for-size --expose-gc');
 
 let mainWindow = null;
 let tray = null;
@@ -97,8 +104,15 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      preload: path.join(__dirname, 'preload.js')
+      preload: path.join(__dirname, 'preload.js'),
+      backgroundThrottling: false,
+      spellcheck: false
     }
+  });
+
+  // Minimize event: drop cached V8 heap and renderer memory back to Windows OS
+  mainWindow.on('minimize', () => {
+    session.defaultSession.clearCache().catch(() => {});
   });
 
   if (iconData.image && !iconData.image.isEmpty()) {

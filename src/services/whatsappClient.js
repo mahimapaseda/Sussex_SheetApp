@@ -112,6 +112,7 @@ async function initializeWhatsApp() {
           '--no-first-run',
           '--no-default-browser-check',
           '--disable-gpu',
+          '--disable-gpu-compositing',
           '--disable-extensions',
           '--disable-plugins',
           '--disable-default-apps',
@@ -120,9 +121,13 @@ async function initializeWhatsApp() {
           '--disable-software-rasterizer',
           '--mute-audio',
           '--no-pings',
+          '--no-zygote',
+          '--disable-breakpad',
+          '--disable-component-update',
+          '--disable-domain-reliability',
           '--renderer-process-limit=1',
-          '--disable-features=TranslateUI,AudioServiceOutOfProcess,MediaRouter,OptimizationHints,CalculateNativeWinOcclusion',
-          '--js-flags=--max-old-space-size=384'
+          '--disable-features=TranslateUI,AudioServiceOutOfProcess,MediaRouter,OptimizationHints,CalculateNativeWinOcclusion,InterestFeedContentSuggestions',
+          '--js-flags=--max-old-space-size=256 --optimize-for-size'
         ]
       }
     });

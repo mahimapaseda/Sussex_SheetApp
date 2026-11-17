@@ -316,6 +316,8 @@ function abortCampaign() {
   clearInterval(countdownInterval);
   engineState = STATE.ABORTED;
   campaignStats.completedAt = new Date().toISOString();
+  campaignQueue.length = 0;
+  try { if (typeof global.gc === 'function') global.gc(); } catch (e) {}
   console.log('[BatchEngine] Campaign aborted by user.');
   return getStatus();
 }
@@ -327,6 +329,8 @@ function finishCampaign(finalState) {
   campaignStats.completedAt = new Date().toISOString();
   campaignStats.currentRecipient = null;
   campaignStats.nextActionInSeconds = 0;
+  campaignQueue.length = 0;
+  try { if (typeof global.gc === 'function') global.gc(); } catch (e) {}
   console.log(`[BatchEngine] Campaign reached end with state: ${finalState}`);
 }
 

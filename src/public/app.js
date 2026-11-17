@@ -988,7 +988,21 @@ function insertTokenIntoTemplate(token) {
   updateTemplateLivePreview();
 }
 
-function filterRosterTable() {
+const ROSTER_PAGE_SIZE = 80;
+let rosterDisplayLimit = ROSTER_PAGE_SIZE;
+
+window.loadMoreRosterRows = function() {
+  rosterDisplayLimit += ROSTER_PAGE_SIZE;
+  filterRosterTable(false);
+};
+
+window.loadAllRosterRows = function() {
+  rosterDisplayLimit = 999999;
+  filterRosterTable(false);
+};
+
+function filterRosterTable(resetLimit = true) {
+  if (resetLimit) rosterDisplayLimit = ROSTER_PAGE_SIZE;
   const q = (els.rosterSearchInput?.value || '').trim().toLowerCase();
   const selectedBranch = appState.selectedBranchFilter;
 
@@ -1018,7 +1032,7 @@ function filterRosterTable() {
   renderRosterTable(filtered);
 
   if (els.branchFilterSummary) {
-    els.branchFilterSummary.textContent = `Showing ${filtered.length} of ${appState.rosterRecords.length} records`;
+    els.branchFilterSummary.textContent = `Showing ${Math.min(filtered.length, rosterDisplayLimit)} of ${filtered.length} records`;
   }
 }
 
@@ -1045,7 +1059,8 @@ function renderRosterTable(records = []) {
     return;
   }
 
-  els.rosterTableBody.innerHTML = records.map(r => `
+  const visibleRecords = records.slice(0, rosterDisplayLimit);
+  const rowsHtml = visibleRecords.map(r => `
     <tr class="hover:bg-[var(--bg-toolbar)]/60 transition-colors duration-200">
       <td class="py-3 px-5 text-center font-mono text-[var(--text-muted)] text-[11px]">${r.rowIndex}</td>
       <td class="py-3 px-5 font-bold text-[var(--text-primary)]">${escapeHtml(r.name)}</td>
@@ -1072,6 +1087,28 @@ function renderRosterTable(records = []) {
       </td>
     </tr>
   `).join('');
+
+  if (records.length > rosterDisplayLimit) {
+    const remaining = records.length - rosterDisplayLimit;
+    const nextCount = Math.min(remaining, ROSTER_PAGE_SIZE);
+    els.rosterTableBody.innerHTML = rowsHtml + `
+      <tr class="bg-[var(--bg-toolbar)]/40 hover:bg-[var(--bg-toolbar)] transition-colors">
+        <td colspan="6" class="py-3.5 px-5 text-center">
+          <div class="inline-flex items-center gap-2">
+            <button type="button" class="btn-neutral px-4 py-1.5 rounded-full text-xs font-semibold shadow-sm inline-flex items-center gap-1.5" onclick="loadMoreRosterRows()">
+              <i class="fa-solid fa-angles-down text-[10px]"></i>
+              <span>Load next ${nextCount} records (${remaining} remaining)</span>
+            </button>
+            <button type="button" class="text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)] font-semibold underline px-2 py-1" onclick="loadAllRosterRows()">
+              Show all (${records.length})
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  } else {
+    els.rosterTableBody.innerHTML = rowsHtml;
+  }
 }
 
 // Direct send to single row
@@ -1988,12 +2025,30 @@ async function clearLedgerHistory() {
   }
 }
 
-// Background Poller
+// Background Poller with Adaptive CPU-Saving Interval
 function startStatusPolling() {
-  clearInterval(appState.pollingTimer);
-  appState.pollingTimer = setInterval(() => {
-    fetchStatus();
-  }, 2000);
+  clearTimeout(appState.pollingTimer);
+
+  const poll = async () => {
+    try {
+      await fetchStatus();
+    } catch (e) {}
+
+    // Determine optimal interval: fast during active campaign, slow when idle/backgrounded
+    const isBusy = (appState.batchStatus && (appState.batchStatus.status === 'RUNNING' || appState.batchStatus.status === 'PACING' || appState.batchStatus.status === 'COOLDOWN'));
+    const isHidden = typeof document !== 'undefined' && document.hidden;
+
+    let delayMs = 3500;
+    if (isBusy) {
+      delayMs = 1200;
+    } else if (isHidden) {
+      delayMs = 8000;
+    }
+
+    appState.pollingTimer = setTimeout(poll, delayMs);
+  };
+
+  appState.pollingTimer = setTimeout(poll, 1500);
 }
 
 // ==========================================
