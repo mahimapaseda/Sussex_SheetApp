@@ -3,6 +3,7 @@ dist/
 build/
 !build/icon.ico
 !build/icon.png
+!build/installer.nsh
 .wwebjs_auth/
 .wwebjs_cache/
 data/.wwebjs_auth/

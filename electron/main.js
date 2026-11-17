@@ -32,6 +32,18 @@ let backendModule = null;
 
 const PORT = process.env.PORT || 3847;
 
+global.sheetAppTrayNotify = (title, content) => {
+  if (tray) {
+    try {
+      tray.displayBalloon?.({ title, content });
+    } catch (e) {}
+  }
+};
+
+global.sheetAppQuitApp = async () => {
+  return quitApplication();
+};
+
 function startBackendServer() {
   try {
     process.env.OPEN_BROWSER_ON_BOOT = 'false';
@@ -42,21 +54,26 @@ function startBackendServer() {
   }
 }
 
-function getIconPath() {
-  try {
-    if (process.resourcesPath) {
-      const resIco = path.join(process.resourcesPath, 'icon.ico');
-      if (fs.existsSync(resIco)) return resIco;
-    }
-  } catch (e) {}
+function getIconImage() {
+  const candidates = [
+    process.resourcesPath ? path.join(process.resourcesPath, 'icon.png') : null,
+    process.resourcesPath ? path.join(process.resourcesPath, 'icon.ico') : null,
+    path.join(__dirname, '../build/icon.png'),
+    path.join(__dirname, '../build/icon.ico'),
+    path.join(__dirname, '../src/public/favicon.png')
+  ];
 
-  const ico = path.join(__dirname, '../build/icon.ico');
-  const png = path.join(__dirname, '../build/icon.png');
-  const pubPng = path.join(__dirname, '../src/public/favicon.png');
-  if (fs.existsSync(ico)) return ico;
-  if (fs.existsSync(png)) return png;
-  if (fs.existsSync(pubPng)) return pubPng;
-  return null;
+  for (const c of candidates) {
+    if (!c || !fs.existsSync(c)) continue;
+    try {
+      let img = nativeImage.createFromPath(c);
+      if (img && !img.isEmpty()) return { image: img, path: c };
+      const buf = fs.readFileSync(c);
+      img = nativeImage.createFromBuffer(buf);
+      if (img && !img.isEmpty()) return { image: img, path: c };
+    } catch (e) {}
+  }
+  return { image: null, path: null };
 }
 
 function createWindow() {
@@ -67,15 +84,14 @@ function createWindow() {
     return;
   }
 
-  const iconPath = getIconPath();
-  const winIcon = iconPath ? nativeImage.createFromPath(iconPath) : null;
+  const iconData = getIconImage();
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 840,
     minWidth: 960,
     minHeight: 640,
     title: 'SheetApp — WhatsApp & Sheets Automation',
-    icon: winIcon || iconPath,
+    icon: iconData.image || iconData.path,
     backgroundColor: '#0b0f19',
     show: false, // Don't show until ready-to-show
     webPreferences: {
@@ -85,22 +101,27 @@ function createWindow() {
     }
   });
 
-  if (winIcon && !winIcon.isEmpty()) {
+  if (iconData.image && !iconData.image.isEmpty()) {
     try {
-      mainWindow.setIcon(winIcon);
+      mainWindow.setIcon(iconData.image);
     } catch (e) {}
   }
 
   mainWindow.setMenuBarVisibility(false);
 
   // If page load attempt happens while server is binding, automatically retry
+  let retryCount = 0;
   mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
-    console.log(`[Electron] Page load attempt waiting for server (${errorCode}), retrying...`);
-    setTimeout(() => {
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.loadURL(`http://localhost:${PORT}`);
-      }
-    }, 400);
+    if (retryCount < 30) {
+      retryCount++;
+      console.log(`[Electron] Page load attempt waiting for server (${errorCode}), retry ${retryCount}/30...`);
+      setTimeout(() => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.loadURL(`http://localhost:${PORT}`);
+        }
+      }, 400);
+    }
+  });
   });
 
   mainWindow.loadURL(`http://localhost:${PORT}`);
@@ -137,11 +158,11 @@ function createWindow() {
 }
 
 function createTray() {
-  const iconPath = getIconPath();
-  if (!iconPath) return;
+  const iconData = getIconImage();
+  if (!iconData.image && !iconData.path) return;
 
   try {
-    tray = new Tray(iconPath);
+    tray = new Tray(iconData.image || iconData.path);
     tray.setToolTip('SheetApp — Sussex College Network');
 
     const contextMenu = Menu.buildFromTemplate([

@@ -42,6 +42,11 @@ const DEFAULT_SETTINGS = {
   googleUserEmail: null,
   googleAuthConnected: false,
 
+  // GitHub In-App Software Auto-Updater
+  githubToken: process.env.GITHUB_TOKEN || embeddedSecrets.GITHUB_TOKEN || '',
+  githubRepoOwner: 'mahimapaseda',
+  githubRepoName: 'Sussex_SheetApp',
+
   // Column Mapping Overrides
   phoneColumn: '',
   nameColumn: '',

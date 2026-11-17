@@ -9,6 +9,7 @@ const googleAuth = require('./services/googleAuth');
 const whatsappClient = require('./services/whatsappClient');
 const batchEngine = require('./services/batchEngine');
 const ledger = require('./services/ledger');
+const updater = require('./services/updater');
 const { extractTokens, interpolateTemplate } = require('./services/templateParser');
 
 process.on('unhandledRejection', (reason) => {
@@ -36,7 +37,7 @@ app.get('/api/status', (req, res) => {
 
   res.json({
     appName: 'SheetApp',
-    version: '1.3.6',
+    version: '1.3.7',
     whatsapp: wa,
     batch,
     settings: userSettings
@@ -502,13 +503,81 @@ app.delete('/api/ledger', (req, res) => {
   res.json({ success: true, message: 'Ledger cleared' });
 });
 
+// 8. In-App Software Auto-Updater APIs (GitHub Releases)
+app.get('/api/updater/status', (req, res) => {
+  res.json(updater.getStatus());
+});
+
+app.post('/api/updater/check', async (req, res) => {
+  try {
+    const result = await updater.checkForUpdates();
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/updater/download', async (req, res) => {
+  try {
+    let status = updater.getStatus();
+    if (status.status === 'DOWNLOADING') {
+      return res.json({ success: true, message: 'Download already in progress.' });
+    }
+    if (!status.updateInfo || !status.updateInfo.asset) {
+      await updater.checkForUpdates();
+    }
+    updater.downloadUpdate().catch(err => {
+      console.error('[Updater] Background download failed:', err.message);
+    });
+    res.json({ success: true, message: 'Download started.' });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/updater/install', (req, res) => {
+  try {
+    const result = updater.installUpdate();
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/updater/cancel', (req, res) => {
+  try {
+    const result = updater.cancelDownload();
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Background Auto-Updater check on boot (non-blocking, delayed 6s)
+setTimeout(() => {
+  updater.checkForUpdates().catch(err => {
+    console.warn('[Updater] Background startup update check notice:', err.message);
+  });
+}, 6000);
+
 // Start Server
 let server = null;
 function startServer(port = config.PORT) {
   if (server && server.listening) return server;
-  server = app.listen(port, () => {
-    console.log(`[SheetApp] Server listening on http://localhost:${port}`);
-  });
+  try {
+    server = app.listen(port, () => {
+      console.log(`[SheetApp] Server listening on http://localhost:${port}`);
+    });
+    server.on('error', (err) => {
+      if (err.code === 'EADDRINUSE') {
+        console.warn(`[SheetApp] Port ${port} is already in use by an active SheetApp instance or process.`);
+      } else {
+        console.error('[SheetApp] Server listener error:', err.message);
+      }
+    });
+  } catch (err) {
+    console.warn(`[SheetApp] Failed to bind to port ${port}:`, err.message);
+  }
   return server;
 }
 
