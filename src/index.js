@@ -35,7 +35,7 @@ app.get('/api/status', (req, res) => {
 
   res.json({
     appName: 'SheetApp',
-    version: '1.0.0',
+    version: '1.3.0',
     whatsapp: wa,
     batch,
     settings: userSettings
