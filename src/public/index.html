@@ -1002,10 +1002,66 @@
         </div>
 
         <div class="space-y-4">
+          <!-- 1. Google Account Sign-In Card -->
+          <div class="card-bento p-4 rounded-2xl border border-[var(--border-hairline)] space-y-3 bg-[var(--bg-panel)] shadow-sm">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <i class="fa-brands fa-google text-red-500 text-xs"></i>
+                <h4 class="text-xs font-bold font-display text-[var(--text-primary)]">Google Account Authorization</h4>
+              </div>
+              <span id="googleAuthStatusPill" class="px-2.5 py-0.5 text-[10.5px] font-semibold rounded-full border border-[var(--border-hairline)] bg-[var(--bg-toolbar)] text-[var(--text-muted)] flex items-center gap-1 shadow-sm">
+                <i class="fa-solid fa-spinner fa-spin text-[9px]"></i>
+                <span>Checking...</span>
+              </span>
+            </div>
+
+            <div id="googleSignInCard" class="bg-[var(--bg-toolbar)] p-3.5 rounded-xl border border-[var(--border-hairline)] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div class="flex items-center gap-3 min-w-0">
+                <div class="h-9 w-9 rounded-xl bg-white dark:bg-slate-900 border border-[var(--border-hairline)] flex items-center justify-center shrink-0 shadow-sm">
+                  <i class="fa-brands fa-google text-red-500 text-base"></i>
+                </div>
+                <div class="min-w-0">
+                  <h5 id="googleUserDisplayTitle" class="text-xs font-bold text-[var(--text-primary)] truncate">Not signed in</h5>
+                  <p id="googleUserDisplaySubtitle" class="text-[11px] text-[var(--text-muted)] truncate">Sign in with your Google account to access private Sussex branch spreadsheets.</p>
+                </div>
+              </div>
+
+              <div class="flex items-center gap-2 shrink-0">
+                <a id="googleSignInBtn" href="/auth/google" target="_blank" class="btn-primary px-3.5 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 transition shadow-sm cursor-pointer whitespace-nowrap">
+                  <i class="fa-brands fa-google"></i>
+                  <span>Sign in with Google</span>
+                </a>
+                <button id="googleSignOutBtn" type="button" class="hidden btn-neutral px-3.5 py-1.5 rounded-full text-xs font-bold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition shadow-sm cursor-pointer whitespace-nowrap">
+                  <i class="fa-solid fa-arrow-right-from-bracket mr-1"></i>
+                  <span>Sign Out</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Optional Custom OAuth Credentials Toggle -->
+            <div>
+              <button id="toggleCustomOauthBtn" type="button" class="text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] flex items-center gap-1 font-semibold transition py-0.5">
+                <i id="toggleCustomOauthIcon" class="fa-solid fa-chevron-right text-[9px] transition-transform"></i>
+                <span>Advanced: Custom Google Cloud Credentials</span>
+              </button>
+              <div id="customOauthFields" class="hidden mt-2.5 pt-2.5 border-t border-[var(--border-hairline)] space-y-2.5">
+                <div>
+                  <label class="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">Custom Google Client ID</label>
+                  <input type="text" id="inputGoogleClientId" placeholder="e.g. 123456789-xyz.apps.googleusercontent.com" class="app-input w-full rounded-xl px-3 py-1.5 text-xs font-mono">
+                </div>
+                <div>
+                  <label class="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">Custom Google Client Secret</label>
+                  <input type="password" id="inputGoogleClientSecret" placeholder="e.g. GOCSPX-xxxxxxxxxxxx" class="app-input w-full rounded-xl px-3 py-1.5 text-xs font-mono">
+                </div>
+                <p class="text-[10px] text-[var(--text-muted)]">Leave blank to use pre-configured official Sussex College credentials.</p>
+              </div>
+            </div>
+          </div>
+
           <div>
-            <label class="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">Google Sheet Spreadsheet ID / URL</label>
+            <label class="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">Direct Google Sheet ID / URL (Fallback)</label>
             <input type="text" id="inputGoogleSheetId" placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms" class="app-input w-full rounded-xl px-3.5 py-2 text-xs font-mono font-medium">
-            <p class="text-[11px] text-[var(--text-muted)] mt-1 font-medium">Leave blank to use the multi-branch configuration.</p>
+            <p class="text-[11px] text-[var(--text-muted)] mt-1 font-medium">Optional fallback. Individual branch spreadsheets can also be added via the Branches button.</p>
           </div>
 
           <div class="grid grid-cols-2 gap-3.5">

@@ -169,6 +169,17 @@ const els = {
   openSettingsModalBtn: $('openSettingsModalBtn'),
   mobileSettingsModalBtn: $('mobileSettingsModalBtn'),
   closeSettingsModalBtn: $('closeSettingsModalBtn'),
+  googleAuthStatusPill: $('googleAuthStatusPill'),
+  googleSignInCard: $('googleSignInCard'),
+  googleUserDisplayTitle: $('googleUserDisplayTitle'),
+  googleUserDisplaySubtitle: $('googleUserDisplaySubtitle'),
+  googleSignInBtn: $('googleSignInBtn'),
+  googleSignOutBtn: $('googleSignOutBtn'),
+  toggleCustomOauthBtn: $('toggleCustomOauthBtn'),
+  toggleCustomOauthIcon: $('toggleCustomOauthIcon'),
+  customOauthFields: $('customOauthFields'),
+  inputGoogleClientId: $('inputGoogleClientId'),
+  inputGoogleClientSecret: $('inputGoogleClientSecret'),
   inputGoogleSheetId: $('inputGoogleSheetId'),
   inputGoogleSheetTab: $('inputGoogleSheetTab'),
   inputCountryCode: $('inputCountryCode'),
@@ -380,6 +391,60 @@ function bindEvents() {
   els.closeSettingsModalBtn?.addEventListener('click', closeSettingsModal);
   els.btnSaveConfig?.addEventListener('click', saveSettingsConfig);
 
+  // Google OAuth 2.0 Sign In, Sign Out & Custom Credentials
+  els.googleSignInBtn?.addEventListener('click', () => {
+    let checks = 0;
+    const pollInterval = setInterval(async () => {
+      checks++;
+      try {
+        const authRes = await fetch('/api/auth/google/status').then(r => r.json());
+        if (authRes.signedIn && authRes.userEmail) {
+          clearInterval(pollInterval);
+          await fetchGoogleAuthStatus();
+          showToast(`Google Account connected: ${authRes.userEmail}`, 'success');
+          loadSheets(true);
+          fetchStatus();
+        }
+      } catch (e) {}
+      if (checks > 40) clearInterval(pollInterval);
+    }, 1500);
+  });
+
+  els.googleSignOutBtn?.addEventListener('click', async () => {
+    if (!confirm('Sign out from your Google Account?')) return;
+    try {
+      const res = await fetch('/api/auth/google/signout', { method: 'POST' }).then(r => r.json());
+      if (res.success) {
+        showToast('Signed out of Google account.', 'info');
+        await fetchGoogleAuthStatus();
+        loadSheets(true);
+        fetchStatus();
+      } else {
+        showToast(res.error || 'Failed to sign out', 'error');
+      }
+    } catch (e) {
+      showToast('Error signing out', 'error');
+    }
+  });
+
+  els.toggleCustomOauthBtn?.addEventListener('click', () => {
+    const isHidden = els.customOauthFields?.classList.toggle('hidden');
+    if (els.toggleCustomOauthIcon) {
+      els.toggleCustomOauthIcon.className = isHidden
+        ? 'fa-solid fa-chevron-right text-[9px] transition-transform'
+        : 'fa-solid fa-chevron-down text-[9px] transition-transform';
+    }
+  });
+
+  window.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'GOOGLE_AUTH_SUCCESS') {
+      fetchGoogleAuthStatus();
+      showToast(`Connected as ${event.data.email}`, 'success');
+      loadSheets(true);
+      fetchStatus();
+    }
+  });
+
   // Developer Attribution & QR Modal
   const openDeveloperModal = () => els.developerModal?.classList.remove('hidden');
   const closeDeveloperModal = () => els.developerModal?.classList.add('hidden');
@@ -497,7 +562,8 @@ async function loadAll() {
     loadSheets(false),
     loadSettingsData(),
     loadAttachedImageData(),
-    loadTemplates()
+    loadTemplates(),
+    fetchGoogleAuthStatus()
   ]);
 }
 
@@ -1241,10 +1307,51 @@ async function deleteAttachedImage() {
 // Settings Modal
 function openSettingsModal() {
   els.settingsModal?.classList.remove('hidden');
+  fetchGoogleAuthStatus();
 }
 function closeSettingsModal() {
   els.settingsModal?.classList.add('hidden');
 }
+
+async function fetchGoogleAuthStatus() {
+  if (!els.googleAuthStatusPill) return;
+  try {
+    const res = await fetch('/api/auth/google/status');
+    const auth = await res.json();
+
+    if (auth.signedIn && auth.userEmail) {
+      if (auth.hasSheetsScope === false) {
+        els.googleAuthStatusPill.className = 'px-2.5 py-0.5 text-[10.5px] font-semibold rounded-full bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 shadow-sm flex items-center gap-1';
+        els.googleAuthStatusPill.innerHTML = '<i class="fa-solid fa-triangle-exclamation text-[9.5px]"></i> <span>Missing Sheets Scope</span>';
+
+        if (els.googleUserDisplayTitle) els.googleUserDisplayTitle.textContent = auth.userEmail;
+        if (els.googleUserDisplaySubtitle) els.googleUserDisplaySubtitle.textContent = 'Signed in, but missing "See all your Google Spreadsheets" permission. Sign out and re-authorize.';
+        els.googleSignInBtn?.classList.remove('hidden');
+        els.googleSignOutBtn?.classList.remove('hidden');
+      } else {
+        els.googleAuthStatusPill.className = 'px-2.5 py-0.5 text-[10.5px] font-semibold rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 shadow-sm flex items-center gap-1';
+        els.googleAuthStatusPill.innerHTML = '<i class="fa-solid fa-circle-check text-[9.5px]"></i> <span>Connected</span>';
+
+        if (els.googleUserDisplayTitle) els.googleUserDisplayTitle.textContent = auth.userEmail;
+        if (els.googleUserDisplaySubtitle) els.googleUserDisplaySubtitle.textContent = 'Active Sussex Google Workspace session. Private sheets access enabled.';
+        els.googleSignInBtn?.classList.add('hidden');
+        els.googleSignOutBtn?.classList.remove('hidden');
+      }
+    } else {
+      els.googleAuthStatusPill.className = 'px-2.5 py-0.5 text-[10.5px] font-semibold rounded-full bg-[var(--bg-toolbar)] text-[var(--text-muted)] border border-[var(--border-hairline)] shadow-sm flex items-center gap-1';
+      els.googleAuthStatusPill.innerHTML = '<i class="fa-regular fa-circle text-[9.5px]"></i> <span>Not signed in</span>';
+
+      if (els.googleUserDisplayTitle) els.googleUserDisplayTitle.textContent = 'Not signed in';
+      if (els.googleUserDisplaySubtitle) els.googleUserDisplaySubtitle.textContent = 'Sign in with your Google account to access private Sussex branch spreadsheets.';
+      els.googleSignInBtn?.classList.remove('hidden');
+      els.googleSignOutBtn?.classList.add('hidden');
+    }
+  } catch (err) {
+    console.warn('[GoogleAuth] Status check failed:', err);
+  }
+}
+
+window.fetchGoogleAuthStatus = fetchGoogleAuthStatus;
 
 async function loadSettingsData() {
   try {
@@ -1254,6 +1361,8 @@ async function loadSettingsData() {
     if (els.inputGoogleSheetTab) els.inputGoogleSheetTab.value = s.googleSheetTab || 'Sheet1';
     if (els.inputCountryCode) els.inputCountryCode.value = s.defaultCountryCode || '94';
     if (els.inputDailyLimit) els.inputDailyLimit.value = s.dailyLimit || 250;
+    if (els.inputGoogleClientId) els.inputGoogleClientId.value = s.googleClientId || '';
+    if (els.inputGoogleClientSecret) els.inputGoogleClientSecret.value = s.googleClientSecret || '';
     if (els.mainTemplateTextarea && s.messageTemplate !== undefined) {
       els.mainTemplateTextarea.value = s.messageTemplate;
     }
@@ -1282,6 +1391,7 @@ async function loadSettingsData() {
     }
 
     updateTemplateLivePreview();
+    fetchGoogleAuthStatus();
   } catch (e) {}
 }
 
@@ -1335,7 +1445,8 @@ async function saveSettingsConfig() {
     googleSheetTab: els.inputGoogleSheetTab?.value.trim(),
     defaultCountryCode: els.inputCountryCode?.value.trim(),
     dailyLimit: parseInt(els.inputDailyLimit?.value || 250, 10),
-    messageTemplate: els.mainTemplateTextarea?.value
+    googleClientId: els.inputGoogleClientId?.value.trim(),
+    googleClientSecret: els.inputGoogleClientSecret?.value.trim()
   };
 
   try {
@@ -1349,6 +1460,7 @@ async function saveSettingsConfig() {
       showToast('Settings saved successfully!', 'success');
       closeSettingsModal();
       fetchStatus();
+      loadSheets(true);
     }
   } catch (e) {
     showToast('Failed to save settings', 'error');

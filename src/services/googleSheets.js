@@ -4,12 +4,18 @@ const { parse } = require('csv-parse/sync');
 const { google } = require('googleapis');
 const config = require('../config/env');
 const settings = require('./settings');
+const googleAuth = require('./googleAuth');
 const { sanitizePhoneNumber } = require('./phoneNormalizer');
 
 // In-memory cache for recent sheet data
 let cachedData = null;
 let lastFetchTime = 0;
 const CACHE_TTL_MS = 15000;
+
+function clearCache() {
+  cachedData = null;
+  lastFetchTime = 0;
+}
 
 function normalizeHeader(str) {
   return String(str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -105,13 +111,27 @@ async function loadSheetData(options = {}) {
   }
 
   // Check if credentials and Google branches are configured
+  const oauthStatus = googleAuth.getAuthStatus();
   const hasServiceAccount = currentSettings.serviceAccountPath && fs.existsSync(currentSettings.serviceAccountPath);
   const hasApiKey = Boolean(currentSettings.googleApiKey);
-  const canFetchGoogle = (hasServiceAccount || hasApiKey) && enabledBranches.length > 0;
+  const hasGoogleOAuth = Boolean(oauthStatus.signedIn && oauthStatus.hasSheetsScope);
+
+  let effectiveBranches = [...enabledBranches];
+  if (effectiveBranches.length === 0 && currentSettings.googleSheetId) {
+    effectiveBranches.push({
+      id: 'default_sheet',
+      name: 'Primary Sheet',
+      spreadsheetId: settings.extractSpreadsheetId(currentSettings.googleSheetId),
+      sheetName: currentSettings.googleSheetTab || 'Sheet1',
+      enabled: true
+    });
+  }
+
+  const canFetchGoogle = (hasGoogleOAuth || hasServiceAccount || hasApiKey) && effectiveBranches.length > 0;
 
   if (sourceType === 'google' || (sourceType === 'auto' && canFetchGoogle)) {
     try {
-      const gResult = await fetchMultiBranchGoogleSheets(enabledBranches, currentSettings);
+      const gResult = await fetchMultiBranchGoogleSheets(effectiveBranches, currentSettings);
       headers = gResult.headers;
       rawRows = gResult.rows;
       source = 'google_sheets';
@@ -262,7 +282,12 @@ async function fetchMultiBranchGoogleSheets(branches, settingsObj) {
   const sheets = google.sheets('v4');
   let authClient = null;
 
-  if (settingsObj.serviceAccountPath && fs.existsSync(settingsObj.serviceAccountPath)) {
+  const oauthSheets = googleAuth.getAuthenticatedSheetsClient();
+  const oauthStatus = googleAuth.getAuthStatus();
+
+  if (oauthSheets && oauthStatus.signedIn) {
+    authClient = googleAuth.getOAuth2Client();
+  } else if (settingsObj.serviceAccountPath && fs.existsSync(settingsObj.serviceAccountPath)) {
     const auth = new google.auth.GoogleAuth({
       keyFile: settingsObj.serviceAccountPath,
       scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly']
@@ -331,5 +356,6 @@ async function fetchMultiBranchGoogleSheets(branches, settingsObj) {
 module.exports = {
   loadSheetData,
   identifyColumns,
-  loadFromLocalSample
+  loadFromLocalSample,
+  clearCache
 };

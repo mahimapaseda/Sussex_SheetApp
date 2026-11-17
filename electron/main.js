@@ -202,12 +202,33 @@ app.whenReady().then(() => {
   });
 });
 
-app.on('second-instance', () => {
+// Register custom protocol so browser can bring SheetApp to foreground after OAuth
+if (process.defaultApp) {
+  if (process.argv.length >= 2) {
+    app.setAsDefaultProtocolClient('sheetapp', process.execPath, [path.resolve(process.argv[1])]);
+  }
+} else {
+  app.setAsDefaultProtocolClient('sheetapp');
+}
+
+function bringWindowToForeground() {
   if (mainWindow) {
     if (mainWindow.isMinimized()) mainWindow.restore();
     mainWindow.show();
     mainWindow.focus();
+    mainWindow.webContents.executeJavaScript("if (typeof fetchGoogleAuthStatus === 'function') fetchGoogleAuthStatus(); if (typeof loadSheets === 'function') loadSheets(true);");
+  } else {
+    createWindow();
   }
+}
+
+app.on('second-instance', () => {
+  bringWindowToForeground();
+});
+
+app.on('open-url', (event, url) => {
+  event.preventDefault();
+  bringWindowToForeground();
 });
 
 app.on('before-quit', (event) => {

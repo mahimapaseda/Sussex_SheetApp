@@ -2,6 +2,11 @@ const fs = require('fs');
 const path = require('path');
 const config = require('../config/env');
 
+let embeddedSecrets = {};
+try {
+  embeddedSecrets = require('../config/oauth.secrets');
+} catch (e) {}
+
 const SETTINGS_FILE = path.join(config.DATA_DIR, 'settings.json');
 
 function extractSpreadsheetId(input) {
@@ -30,6 +35,12 @@ const DEFAULT_SETTINGS = {
   googleSheetTab: 'Sheet1',
   googleApiKey: '',
   serviceAccountPath: '',
+
+  // Google OAuth 2.0 (Sign In with Google)
+  googleClientId: process.env.GOOGLE_CLIENT_ID || embeddedSecrets.GOOGLE_CLIENT_ID || '',
+  googleClientSecret: process.env.GOOGLE_CLIENT_SECRET || embeddedSecrets.GOOGLE_CLIENT_SECRET || '',
+  googleUserEmail: null,
+  googleAuthConnected: false,
 
   // Column Mapping Overrides
   phoneColumn: '',
@@ -113,6 +124,13 @@ function loadSettings() {
       t.enabled = (i === enabledIndex);
     });
     merged.activeTemplateId = merged.savedTemplates[enabledIndex].id;
+
+    if (!merged.googleClientId && (embeddedSecrets.GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID)) {
+      merged.googleClientId = process.env.GOOGLE_CLIENT_ID || embeddedSecrets.GOOGLE_CLIENT_ID || '';
+    }
+    if (!merged.googleClientSecret && (embeddedSecrets.GOOGLE_CLIENT_SECRET || process.env.GOOGLE_CLIENT_SECRET)) {
+      merged.googleClientSecret = process.env.GOOGLE_CLIENT_SECRET || embeddedSecrets.GOOGLE_CLIENT_SECRET || '';
+    }
 
     return merged;
   } catch (err) {
@@ -409,6 +427,7 @@ function deleteTemplate(id) {
 module.exports = {
   loadSettings,
   saveSettings,
+  updateSettings: saveSettings,
   getBranches,
   addBranch,
   updateBranch,

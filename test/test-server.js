@@ -200,6 +200,22 @@ async function run() {
   assert.strictEqual(delTemplateRes.body.success, true);
   console.log('  ✓ DELETE /api/templates/:id removes non-active template cleanly');
 
+  // Test 7: Google OAuth Status & Auth URL Generation
+  const googleStatusRes = await get('/api/auth/google/status');
+  assert.strictEqual(googleStatusRes.status, 200);
+  assert.strictEqual(googleStatusRes.body.success, true);
+  assert.strictEqual(googleStatusRes.body.configured, true, 'OAuth should be configured via embedded secrets or env');
+  console.log('  ✓ GET /api/auth/google/status reports configured OAuth status');
+
+  const redirectRes = await new Promise((resolve, reject) => {
+    http.get(`http://localhost:${TEST_PORT}/auth/google`, (res) => {
+      resolve({ status: res.statusCode, location: res.headers.location });
+    }).on('error', reject);
+  });
+  assert.strictEqual(redirectRes.status, 302);
+  assert.ok(redirectRes.location.includes('accounts.google.com'), 'Redirect URL should point to Google OAuth consent screen');
+  console.log('  ✓ GET /auth/google redirects to Google accounts consent screen');
+
   console.log('\n==============================================');
   console.log('  API INTEGRATION VERIFICATION PASSED!        ');
   console.log('==============================================');

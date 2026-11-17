@@ -5,6 +5,7 @@ const fs = require('fs');
 const config = require('./config/env');
 const settings = require('./services/settings');
 const googleSheets = require('./services/googleSheets');
+const googleAuth = require('./services/googleAuth');
 const whatsappClient = require('./services/whatsappClient');
 const batchEngine = require('./services/batchEngine');
 const ledger = require('./services/ledger');
@@ -140,6 +141,117 @@ app.patch('/api/branches/:id/toggle', (req, res) => {
     res.json({ success: true, branch });
   } catch (err) {
     res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// Google OAuth 2.0 (Sign in with Google) Endpoints
+app.get('/auth/google', (req, res) => {
+  try {
+    const authUrl = googleAuth.getAuthUrl();
+    res.redirect(authUrl);
+  } catch (err) {
+    res.status(400).send(`
+      <html>
+        <body style="font-family: sans-serif; background: #0f172a; color: #fff; padding: 40px; text-align: center;">
+          <h2 style="color: #f87171;">Google Sign-In Configuration Required</h2>
+          <p>${err.message}</p>
+          <p style="margin-top: 20px;"><a href="/#settings" style="color: #38bdf8; text-decoration: none; border: 1px solid #38bdf8; padding: 8px 16px; border-radius: 6px; font-weight: 600;">Back to SheetApp Settings</a></p>
+        </body>
+      </html>
+    `);
+  }
+});
+
+app.get('/auth/google/callback', async (req, res) => {
+  const { code, error } = req.query;
+  if (error) {
+    return res.status(400).send(`Google Login Failed: ${error}`);
+  }
+  if (!code) {
+    return res.status(400).send('Authorization code missing.');
+  }
+
+  try {
+    const result = await googleAuth.handleCallback(code);
+    googleSheets.clearCache();
+
+    if (result.missingSheetsScope) {
+      return res.status(403).send(`
+        <!DOCTYPE html>
+        <html>
+          <head><title>Google Sheets Permission Required - SheetApp</title></head>
+          <body style="font-family: 'Segoe UI', system-ui, sans-serif; background: #F4F5F7; color: #111827; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0;">
+            <div style="background: #FFFFFF; border: 1px solid #FECACA; border-radius: 12px; padding: 32px; max-width: 460px; text-align: center; box-shadow: 0 4px 16px rgba(0,0,0,0.08);">
+              <h2 style="margin: 0 0 10px 0; color: #B91C1C; font-size: 18px; font-weight: 700;">Google Sheets Permission Not Checked</h2>
+              <p style="font-size: 13px; color: #374151; line-height: 1.5;">You signed in as <strong>${result.email}</strong>, but did not tick the <strong>"See all your Google Spreadsheets"</strong> permission checkbox on the Google consent screen.</p>
+              <p style="font-size: 13px; color: #374151; line-height: 1.5; margin-top: 8px;">Please click the button below and ensure <strong>all permission checkboxes are ticked</strong> before continuing.</p>
+              <a href="/auth/google" style="display: inline-block; margin-top: 18px; background: #1B365D; color: #FFFFFF; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 600;">Sign in Again &amp; Grant Permission</a>
+            </div>
+          </body>
+        </html>
+      `);
+    }
+
+    res.send(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Google Sign-In Successful - SheetApp</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <style>
+            body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: #F4F5F7; color: #111827; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+            .card { background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 12px; padding: 32px; max-width: 440px; text-align: center; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08); }
+            .icon { width: 50px; height: 50px; background: #ECFDF5; border: 1px solid #A7F3D0; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; color: #15803D; font-size: 24px; font-weight: 700; margin-bottom: 16px; }
+            h2 { margin: 0 0 8px 0; font-size: 18px; color: #111827; font-weight: 700; }
+            p { margin: 6px 0; font-size: 13px; color: #4B5563; line-height: 1.5; }
+            .email-badge { display: inline-block; background: #F3F4F6; border: 1px solid #D1D5DB; color: #1B365D; font-weight: 600; padding: 4px 12px; border-radius: 6px; margin: 10px 0; font-size: 13px; }
+            .btn { display: inline-block; margin-top: 20px; background: #1B365D; color: #FFFFFF; padding: 10px 22px; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: 600; transition: background 0.15s; }
+            .btn:hover { background: #25477A; }
+            .countdown { font-size: 12px; color: #6B7280; margin-top: 14px; }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <div class="icon">✓</div>
+            <h2>Google Account Connected</h2>
+            <div><span class="email-badge">${result.email}</span></div>
+            <p>Your Google account is now authorized for SheetApp. Returning you to the application.</p>
+            <a href="sheetapp://auth-success" class="btn" id="openAppBtn" onclick="returnToApp()">Open SheetApp</a>
+            <div class="countdown" id="cd">Switching back to SheetApp automatically...</div>
+          </div>
+          <script>
+            function returnToApp() {
+              window.location.href = 'sheetapp://auth-success';
+              if (window.opener) {
+                try {
+                  window.opener.postMessage({ type: 'GOOGLE_AUTH_SUCCESS', email: '${result.email}' }, '*');
+                  window.opener.location.reload();
+                } catch (e) {}
+                setTimeout(() => window.close(), 600);
+              }
+            }
+            setTimeout(returnToApp, 1000);
+          </script>
+        </body>
+      </html>
+    `);
+  } catch (err) {
+    res.status(500).send(`Error completing Google Sign-In: ${err.message}`);
+  }
+});
+
+app.get('/api/auth/google/status', (req, res) => {
+  const status = googleAuth.getAuthStatus();
+  res.json({ success: true, ...status });
+});
+
+app.post('/api/auth/google/signout', (req, res) => {
+  try {
+    const result = googleAuth.signOut();
+    googleSheets.clearCache();
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
