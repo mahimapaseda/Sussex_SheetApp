@@ -1,6 +1,6 @@
 {
   "name": "sheetapp",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "SheetApp - Compliant Google Sheets & WhatsApp Batch Automation Platform",
   "main": "electron/main.js",
   "type": "commonjs",
