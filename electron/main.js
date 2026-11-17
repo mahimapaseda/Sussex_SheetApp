@@ -122,7 +122,6 @@ function createWindow() {
       }, 400);
     }
   });
-  });
 
   mainWindow.loadURL(`http://localhost:${PORT}`);
 
