@@ -1879,7 +1879,6 @@ async function handleSaveTemplatePreset(e) {
     showToast('Failed to save template preset', 'error');
   }
 }
-}
 
 // Delivery Ledger Logs
 async function loadLedgerLogs() {
