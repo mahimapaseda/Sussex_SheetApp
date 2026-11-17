@@ -631,7 +631,10 @@ function updateHeaderStatuses(data) {
 function updateMetrics(data) {
   const batch = data.batch || {};
   if (els.statSentToday) {
-    els.statSentToday.innerHTML = `${batch.dailySent || 0} <span class="text-xs font-normal text-[var(--text-muted)]">/ ${batch.dailyLimit || 250}</span>`;
+    els.statSentToday.textContent = batch.dailySent || 0;
+  }
+  if (els.statDailyLimitQuota) {
+    els.statDailyLimitQuota.textContent = `/ ${batch.dailyLimit || 250}`;
   }
   if (els.statRiskRating && batch.risk) {
     els.statRiskRating.textContent = batch.risk.label.split(' ')[0] + ' Risk';
