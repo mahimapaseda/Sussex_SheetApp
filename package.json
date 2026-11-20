@@ -1,6 +1,6 @@
 {
   "name": "sheetapp",
-  "version": "1.4.2",
+  "version": "1.4.3",
   "description": "SheetApp - Compliant Google Sheets & WhatsApp Batch Automation Platform",
   "main": "electron/main.js",
   "type": "commonjs",
@@ -99,7 +99,8 @@
     "googleapis": "^144.0.0",
     "open": "^10.1.0",
     "qrcode": "^1.5.4",
-    "whatsapp-web.js": "^1.26.0"
+    "whatsapp-web.js": "^1.26.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "electron": "^33.2.0",

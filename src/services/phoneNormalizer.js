@@ -1,18 +1,22 @@
 /**
  * Phone Number Normalizer & Sanitizer
- * Handles international phone formats and auto-infers default country codes (e.g. 94 for Sri Lanka)
+ * Handles international phone formats, multi-number cell values, and auto-infers country codes
  */
 
-function sanitizePhoneNumber(rawPhone, defaultCountryCode = '94') {
-  if (!rawPhone) return { isValid: false, normalized: null, raw: rawPhone };
+function sanitizeSinglePhone(rawStr, defaultCountryCode = '94') {
+  if (!rawStr) return { isValid: false, normalized: null, raw: rawStr };
 
-  // Strip all non-numeric characters except leading '+'
-  let str = String(rawPhone).trim();
+  let str = String(rawStr).trim();
+  // Strip trailing float zeroes like .0 from Excel/Sheets numbers
+  if (/^\d+\.0+$/.test(str)) {
+    str = str.split('.')[0];
+  }
+
   const hasPlus = str.startsWith('+');
   let digitsOnly = str.replace(/\D/g, '');
 
   if (!digitsOnly || digitsOnly.length < 7) {
-    return { isValid: false, normalized: null, raw: rawPhone, error: 'Too short' };
+    return { isValid: false, normalized: null, raw: rawStr, error: 'Too short' };
   }
 
   // Sri Lanka handling (defaultCountryCode == '94')
@@ -53,10 +57,36 @@ function sanitizePhoneNumber(rawPhone, defaultCountryCode = '94') {
     isValid,
     normalized: isValid ? digitsOnly : null,
     formatted: isValid ? `+${digitsOnly}` : null,
-    raw: rawPhone
+    raw: rawStr
   };
 }
 
+function sanitizePhoneNumber(rawPhone, defaultCountryCode = '94') {
+  if (rawPhone === null || rawPhone === undefined || String(rawPhone).trim() === '') {
+    return { isValid: false, normalized: null, raw: '' };
+  }
+
+  let str = String(rawPhone).trim();
+
+  // If cell contains multiple numbers separated by slash, comma, semicolon, newline, or 'or' / '&'
+  // Example: "0762364124 / 0706486351", "768123643, 759363643"
+  const candidates = str.split(/[/,;&\n]|\s+or\s+|\s+and\s+/i).map(s => s.trim()).filter(Boolean);
+  if (candidates.length > 1) {
+    for (const candidate of candidates) {
+      const res = sanitizeSinglePhone(candidate, defaultCountryCode);
+      if (res.isValid) {
+        return {
+          ...res,
+          raw: str // Keep original string for display
+        };
+      }
+    }
+  }
+
+  return sanitizeSinglePhone(str, defaultCountryCode);
+}
+
 module.exports = {
-  sanitizePhoneNumber
+  sanitizePhoneNumber,
+  sanitizeSinglePhone
 };

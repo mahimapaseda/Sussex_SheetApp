@@ -58,6 +58,24 @@ runTest('Sanitize 785551234 without leading zero -> 94785551234', () => {
   assert.strictEqual(res.normalized, '94785551234');
 });
 
+runTest('Sanitize multiple numbers in one cell "0762364124 / 0706486351" -> picks first valid', () => {
+  const res = sanitizePhoneNumber('0762364124 / 0706486351', '94');
+  assert.strictEqual(res.isValid, true);
+  assert.strictEqual(res.normalized, '94762364124');
+});
+
+runTest('Sanitize Excel floating point format 741717590.0 -> 94741717590', () => {
+  const res = sanitizePhoneNumber('741717590.0', '94');
+  assert.strictEqual(res.isValid, true);
+  assert.strictEqual(res.normalized, '94741717590');
+});
+
+runTest('Sanitize phone with spaced format " 74 354 2878 " -> 94743542878', () => {
+  const res = sanitizePhoneNumber(' 74 354 2878 ', '94');
+  assert.strictEqual(res.isValid, true);
+  assert.strictEqual(res.normalized, '94743542878');
+});
+
 runTest('Reject invalid or short phone string', () => {
   const res = sanitizePhoneNumber('1234', '94');
   assert.strictEqual(res.isValid, false);
@@ -95,6 +113,15 @@ runTest('Auto-detect Phone and Name columns from noisy headers', () => {
   assert.strictEqual(cols.nameColumn, 'Student Name');
   assert.strictEqual(cols.phoneColumn, 'Father T.P.');
   assert.strictEqual(cols.statusColumn, 'WhatsApp Status');
+});
+
+runTest('Auto-detect Sussex College headers "Name of Student" and "Contact No"', () => {
+  const headers = ['Source', 'Date', 'Name of Student', 'Contact No', 'Proposed Year', 'Status '];
+  const cols = identifyColumns(headers);
+  assert.strictEqual(cols.nameColumn, 'Name of Student');
+  assert.strictEqual(cols.phoneColumn, 'Contact No');
+  assert.strictEqual(cols.statusColumn, 'Status ');
+  assert.strictEqual(cols.branchColumn, 'Source');
 });
 
 // 4. Rate-Limit Risk Level Evaluation

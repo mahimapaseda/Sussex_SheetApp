@@ -37,7 +37,7 @@ app.get('/api/status', (req, res) => {
 
   res.json({
     appName: 'SheetApp',
-    version: '1.4.2',
+    version: '1.4.3',
     whatsapp: wa,
     batch,
     settings: userSettings
@@ -284,11 +284,44 @@ app.post('/api/whatsapp/disconnect', async (req, res) => {
 app.get('/api/sheets/load', async (req, res) => {
   try {
     const forceRefresh = req.query.refresh === '1';
-    const sheetData = await googleSheets.loadSheetData({ forceRefresh });
+    const phoneColOverride = req.query.phoneCol;
+    const nameColOverride = req.query.nameCol;
+    const sheetData = await googleSheets.loadSheetData({
+      forceRefresh,
+      phoneColOverride,
+      nameColOverride
+    });
     res.json({ success: true, ...sheetData });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
+});
+
+// Local Excel / CSV File Upload Endpoint
+app.post('/api/sheets/upload', (req, res) => {
+  try {
+    const { fileName, fileBase64, branchName } = req.body;
+    if (!fileBase64) {
+      return res.status(400).json({ success: false, error: 'No file data received.' });
+    }
+    const buffer = Buffer.from(fileBase64, 'base64');
+    const result = googleSheets.loadFromExcelBuffer(buffer, fileName || 'Spreadsheet.xlsx', branchName || 'Imported File');
+    googleSheets.setUploadedFileData(result);
+    res.json({
+      success: true,
+      totalRows: result.rows.length,
+      headers: result.headers,
+      sheetName: result.sheetName
+    });
+  } catch (err) {
+    console.error('[Sheets] Upload parsing error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/sheets/clear-upload', (req, res) => {
+  googleSheets.clearUploadedFileData();
+  res.json({ success: true });
 });
 
 // 5. Campaign Preview & Estimation API

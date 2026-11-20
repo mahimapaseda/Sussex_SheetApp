@@ -87,6 +87,8 @@ const els = {
 
   // Action Bar
   btnSyncSheets: $('btnSyncSheets'),
+  btnImportExcel: $('btnImportExcel'),
+  inputLocalSpreadsheet: $('inputLocalSpreadsheet'),
   btnOpenManualSend: $('btnOpenManualSend'),
   btnLaunchBatch: $('btnLaunchBatch'),
 
@@ -530,8 +532,55 @@ function bindEvents() {
 
   // Roster Filter & Mapping
   els.rosterSearchInput?.addEventListener('input', filterRosterTable);
-  els.selectPhoneCol?.addEventListener('change', () => loadSheets(false));
-  els.selectNameCol?.addEventListener('change', () => loadSheets(false));
+  els.selectPhoneCol?.addEventListener('change', () => {
+    loadSheets(false, els.selectPhoneCol.value, els.selectNameCol?.value);
+  });
+  els.selectNameCol?.addEventListener('change', () => {
+    loadSheets(false, els.selectPhoneCol?.value, els.selectNameCol.value);
+  });
+
+  // Excel / CSV File Import
+  els.btnImportExcel?.addEventListener('click', () => {
+    els.inputLocalSpreadsheet?.click();
+  });
+
+  els.inputLocalSpreadsheet?.addEventListener('change', async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      showToast('Reading spreadsheet file...', 'info');
+      const reader = new FileReader();
+      reader.onload = async (evt) => {
+        try {
+          const base64Data = evt.target.result.split(',')[1];
+          const uploadRes = await fetch('/api/sheets/upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              fileName: file.name,
+              fileBase64: base64Data,
+              branchName: file.name.replace(/\.[^/.]+$/, '')
+            })
+          });
+          const uploadData = await uploadRes.json();
+          if (!uploadData.success) {
+            throw new Error(uploadData.error || 'Failed to parse Excel file.');
+          }
+
+          showToast(`Ingested ${uploadData.totalRows} contacts from ${file.name}`, 'success');
+          await loadSheets(true);
+        } catch (err) {
+          showToast(`Error importing file: ${err.message}`, 'error');
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      showToast(`Upload failed: ${err.message}`, 'error');
+    } finally {
+      e.target.value = '';
+    }
+  });
 
   // Attached Image Sharing Events
   els.imageUploadDropzone?.addEventListener('click', () => els.attachedImageFileInput?.click());
@@ -917,9 +966,13 @@ function populateBranchFilterDropdown(branches = []) {
 }
 
 // Sheets Ingestion
-async function loadSheets(forceRefresh = false) {
+async function loadSheets(forceRefresh = false, phoneColOverride = null, nameColOverride = null) {
   try {
-    const res = await fetch(`/api/sheets/load?refresh=${forceRefresh ? '1' : '0'}`);
+    let url = `/api/sheets/load?refresh=${forceRefresh ? '1' : '0'}`;
+    if (phoneColOverride) url += `&phoneCol=${encodeURIComponent(phoneColOverride)}`;
+    if (nameColOverride) url += `&nameCol=${encodeURIComponent(nameColOverride)}`;
+
+    const res = await fetch(url);
     const data = await res.json();
     appState.sheetData = data;
     appState.rosterRecords = data.records || [];
@@ -929,7 +982,8 @@ async function loadSheets(forceRefresh = false) {
         els.sheetsStatusText.textContent = 'No Sheets Connected';
         els.sheetsStatusText.className = 'inline-block align-bottom font-medium text-gray-500 dark:text-gray-400 truncate max-w-[140px] xl:max-w-[170px]';
       } else {
-        els.sheetsStatusText.textContent = `Connected (${data.totalRows} rows)`;
+        const sourceLabel = data.source === 'uploaded_file' ? 'File Ingested' : 'Connected';
+        els.sheetsStatusText.textContent = `${sourceLabel} (${data.totalRows} rows)`;
         els.sheetsStatusText.className = 'inline-block align-bottom font-medium text-emerald-700 dark:text-emerald-400 truncate max-w-[140px] xl:max-w-[170px]';
       }
     }
@@ -1065,8 +1119,8 @@ function renderRosterTable(records = []) {
       <td class="py-3 px-5 text-center font-mono text-[var(--text-muted)] text-[11px]">${r.rowIndex}</td>
       <td class="py-3 px-5 font-bold text-[var(--text-primary)]">${escapeHtml(r.name)}</td>
       <td class="py-3 px-5 font-mono">
-        <span class="${r.isValidPhone ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : 'text-red-500 font-semibold'}">
-          ${r.isValidPhone ? (r.phoneFormatted || r.normalizedPhone) : (r.rawPhone || 'Invalid')}
+        <span class="${r.isValidPhone ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : 'text-red-500 font-medium'}">
+          ${r.isValidPhone ? (r.phoneFormatted || r.normalizedPhone) : (r.rawPhone ? `${escapeHtml(r.rawPhone)} (Invalid)` : '<span class="text-gray-400 dark:text-gray-500 italic font-normal text-xs">No Phone</span>')}
         </span>
       </td>
       <td class="py-3 px-5 text-[var(--text-secondary)]">
