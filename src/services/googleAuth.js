@@ -11,9 +11,60 @@ try {
 
 const TOKEN_PATH = path.join(config.DATA_DIR, 'google_token.json');
 
+function getWishSyncTokenPath() {
+  if (process.env.APPDATA) {
+    return path.join(process.env.APPDATA, 'WishSync', 'google_token.json');
+  }
+  return null;
+}
+
+function syncTokenFromWishSync() {
+  if (!fs.existsSync(TOKEN_PATH)) {
+    const wsPath = getWishSyncTokenPath();
+    if (wsPath && fs.existsSync(wsPath)) {
+      try {
+        const raw = fs.readFileSync(wsPath, 'utf8');
+        const data = JSON.parse(raw);
+        if (data && (data.access_token || data.refresh_token)) {
+          fs.writeFileSync(TOKEN_PATH, JSON.stringify(data, null, 2), 'utf8');
+          console.log('[GoogleAuth] Successfully synchronized Google OAuth tokens from WishSync.');
+          if (data.userEmail) {
+            settings.updateSettings({
+              googleUserEmail: data.userEmail,
+              googleAuthConnected: true
+            });
+          }
+          return data;
+        }
+      } catch (e) {
+        console.warn('[GoogleAuth] Could not read WishSync token:', e.message);
+      }
+    }
+  }
+  return null;
+}
+
+function syncTokenToWishSync(tokens) {
+  try {
+    const wsPath = getWishSyncTokenPath();
+    if (wsPath) {
+      const wsDir = path.dirname(wsPath);
+      if (fs.existsSync(wsDir)) {
+        fs.writeFileSync(wsPath, JSON.stringify(tokens, null, 2), 'utf8');
+        console.log('[GoogleAuth] Synchronized Google OAuth tokens to WishSync.');
+      }
+    }
+  } catch (e) {
+    // Non-critical, ignore
+  }
+}
+
 function getRedirectUri() {
-  const currentPort = process.env.PORT || config.PORT || 3847;
-  return `http://localhost:${currentPort}/auth/google/callback`;
+  // Google Cloud Console registered OAuth redirect URI is on port 3847
+  if (process.env.GOOGLE_REDIRECT_URI) {
+    return process.env.GOOGLE_REDIRECT_URI;
+  }
+  return 'http://localhost:3847/auth/google/callback';
 }
 
 // Google OAuth2 scopes for reading user email and spreadsheets
@@ -44,6 +95,9 @@ function getOAuth2Client() {
   if (!clientId || !clientSecret) {
     return null;
   }
+
+  // Ensure tokens are synced from WishSync if available
+  syncTokenFromWishSync();
 
   const oauth2Client = new google.auth.OAuth2(
     clientId,
@@ -94,6 +148,7 @@ function saveTokens(tokens) {
   try {
     fs.writeFileSync(TOKEN_PATH, JSON.stringify(tokens, null, 2), 'utf8');
     console.log('[GoogleAuth] Google OAuth tokens saved successfully.');
+    syncTokenToWishSync(tokens);
   } catch (err) {
     console.error('[GoogleAuth] Failed to save tokens:', err.message);
   }
@@ -148,6 +203,7 @@ async function handleCallback(code) {
  * Checks current Google Sign-in status.
  */
 function getAuthStatus() {
+  syncTokenFromWishSync();
   const currentSettings = settings.loadSettings();
   const hasClientId = Boolean(currentSettings.googleClientId || process.env.GOOGLE_CLIENT_ID || embeddedSecrets.GOOGLE_CLIENT_ID);
   const hasSecret = Boolean(currentSettings.googleClientSecret || process.env.GOOGLE_CLIENT_SECRET || embeddedSecrets.GOOGLE_CLIENT_SECRET);

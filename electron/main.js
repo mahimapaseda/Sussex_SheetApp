@@ -37,7 +37,7 @@ let shutdownCompleted = false;
 let quitPromise = null;
 let backendModule = null;
 
-const PORT = process.env.PORT || 3847;
+let PORT = process.env.PORT || 3848;
 
 global.sheetAppTrayNotify = (title, content) => {
   if (tray) {
@@ -55,6 +55,9 @@ function startBackendServer() {
   try {
     process.env.OPEN_BROWSER_ON_BOOT = 'false';
     backendModule = require('../src/index.js');
+    if (backendModule && typeof backendModule.getPort === 'function') {
+      PORT = backendModule.getPort();
+    }
     console.log('[Electron] Embedded SheetApp Express server active on port ' + PORT);
   } catch (err) {
     console.error('[Electron] Failed to start embedded backend:', err);
@@ -123,12 +126,19 @@ function createWindow() {
 
   mainWindow.setMenuBarVisibility(false);
 
+  if (backendModule && typeof backendModule.getPort === 'function') {
+    PORT = backendModule.getPort();
+  }
+
   // If page load attempt happens while server is binding, automatically retry
   let retryCount = 0;
   mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
     if (retryCount < 30) {
       retryCount++;
-      console.log(`[Electron] Page load attempt waiting for server (${errorCode}), retry ${retryCount}/30...`);
+      if (backendModule && typeof backendModule.getPort === 'function') {
+        PORT = backendModule.getPort();
+      }
+      console.log(`[Electron] Page load attempt waiting for server (${errorCode}), retry ${retryCount}/30 on port ${PORT}...`);
       setTimeout(() => {
         if (mainWindow && !mainWindow.isDestroyed()) {
           mainWindow.loadURL(`http://localhost:${PORT}`);
@@ -235,8 +245,14 @@ async function quitApplication() {
   return quitPromise;
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   startBackendServer();
+  if (backendModule && typeof backendModule.startServer === 'function') {
+    try {
+      const boundPort = await backendModule.startServer(PORT);
+      if (boundPort) PORT = boundPort;
+    } catch (e) {}
+  }
   createTray();
   createWindow();
 

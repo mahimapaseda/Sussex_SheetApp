@@ -37,7 +37,7 @@ app.get('/api/status', (req, res) => {
 
   res.json({
     appName: 'SheetApp',
-    version: '1.4.0',
+    version: '1.4.1',
     whatsapp: wa,
     batch,
     settings: userSettings
@@ -561,24 +561,119 @@ setTimeout(() => {
 }, 6000);
 
 // Start Server
+let actualPort = config.PORT;
 let server = null;
-function startServer(port = config.PORT) {
-  if (server && server.listening) return server;
+let oauthHelperServer = null;
+
+function tryStartOAuthHelper() {
+  if (actualPort === 3847) return; // Already running on 3847
+  if (oauthHelperServer && oauthHelperServer.listening) return;
+
   try {
-    server = app.listen(port, () => {
-      console.log(`[SheetApp] Server listening on http://localhost:${port}`);
-    });
-    server.on('error', (err) => {
-      if (err.code === 'EADDRINUSE') {
-        console.warn(`[SheetApp] Port ${port} is already in use by an active SheetApp instance or process.`);
-      } else {
-        console.error('[SheetApp] Server listener error:', err.message);
+    const oauthApp = express();
+    oauthApp.use(cors());
+    oauthApp.get('/auth/google/callback', async (req, res) => {
+      const { code, error } = req.query;
+      if (error) {
+        return res.status(400).send(`Google Login Failed: ${error}`);
+      }
+      if (!code) {
+        return res.status(400).send('Authorization code missing.');
+      }
+      try {
+        const result = await googleAuth.handleCallback(code);
+        googleSheets.clearCache();
+        res.send(`
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <title>Google Sign-In Successful - SheetApp</title>
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <style>
+                body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: #F4F5F7; color: #111827; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+                .card { background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 12px; padding: 32px; max-width: 440px; text-align: center; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08); }
+                .icon { width: 50px; height: 50px; background: #ECFDF5; border: 1px solid #A7F3D0; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; color: #15803D; font-size: 24px; font-weight: 700; margin-bottom: 16px; }
+                h2 { margin: 0 0 8px 0; font-size: 18px; color: #111827; font-weight: 700; }
+                p { margin: 6px 0; font-size: 13px; color: #4B5563; line-height: 1.5; }
+                .email-badge { display: inline-block; background: #F3F4F6; border: 1px solid #D1D5DB; color: #1B365D; font-weight: 600; padding: 4px 12px; border-radius: 6px; margin: 10px 0; font-size: 13px; }
+                .btn { display: inline-block; margin-top: 20px; background: #1B365D; color: #FFFFFF; padding: 10px 22px; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: 600; transition: background 0.15s; }
+                .btn:hover { background: #25477A; }
+              </style>
+            </head>
+            <body>
+              <div class="card">
+                <div class="icon">✓</div>
+                <h2>Google Account Connected</h2>
+                <div><span class="email-badge">${result.email}</span></div>
+                <p>Your Google account is now authorized for SheetApp. Returning you to the application.</p>
+                <a href="http://localhost:${actualPort}" class="btn">Open SheetApp</a>
+              </div>
+              <script>
+                function returnToApp() {
+                  window.location.href = 'sheetapp://auth-success';
+                  setTimeout(() => {
+                    window.location.href = 'http://localhost:${actualPort}';
+                  }, 1200);
+                }
+                setTimeout(returnToApp, 800);
+              </script>
+            </body>
+          </html>
+        `);
+      } catch (err) {
+        res.status(500).send(`Error completing Google Sign-In: ${err.message}`);
       }
     });
-  } catch (err) {
-    console.warn(`[SheetApp] Failed to bind to port ${port}:`, err.message);
+
+    oauthHelperServer = oauthApp.listen(3847, () => {
+      console.log('[SheetApp] OAuth callback listener active on port 3847');
+    });
+    oauthHelperServer.on('error', (err) => {
+      if (err.code === 'EADDRINUSE') {
+        console.log('[SheetApp] Port 3847 is owned by WishSync; cross-app Google token synchronization active.');
+      }
+    });
+  } catch (e) {
+    // Ignore error
   }
-  return server;
+}
+
+function startServer(preferredPort = config.PORT) {
+  if (server && server.listening) return Promise.resolve(actualPort);
+
+  return new Promise((resolve) => {
+    let port = preferredPort;
+    const maxAttempts = 10;
+    let attempts = 0;
+
+    function tryBind() {
+      const s = app.listen(port, () => {
+        server = s;
+        actualPort = port;
+        console.log(`[SheetApp] Server listening on http://localhost:${actualPort}`);
+        tryStartOAuthHelper();
+        resolve(actualPort);
+      });
+
+      s.on('error', (err) => {
+        if (err.code === 'EADDRINUSE' && attempts < maxAttempts) {
+          attempts++;
+          port++;
+          console.warn(`[SheetApp] Port ${port - 1} is in use, trying next port ${port}...`);
+          setTimeout(tryBind, 50);
+        } else {
+          console.error(`[SheetApp] Server listener error on port ${port}:`, err.message);
+          resolve(port);
+        }
+      });
+    }
+
+    tryBind();
+  });
+}
+
+function getPort() {
+  return actualPort;
 }
 
 let backendShutdownPromise = null;
@@ -589,6 +684,10 @@ function shutdownBackend() {
     try {
       await whatsappClient.disconnectClient(false);
     } catch (e) {}
+
+    if (oauthHelperServer && oauthHelperServer.listening) {
+      try { oauthHelperServer.close(); } catch (e) {}
+    }
 
     await new Promise((resolve) => {
       if (!server || !server.listening) return resolve();
@@ -619,4 +718,4 @@ process.on('SIGINT', () => {
   shutdownBackend().finally(() => process.exit(0));
 });
 
-module.exports = { app, server, startServer, shutdownBackend };
+module.exports = { app, server, startServer, shutdownBackend, getPort };

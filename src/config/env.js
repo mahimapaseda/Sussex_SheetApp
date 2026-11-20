@@ -4,7 +4,7 @@ require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 
 const ROOT_DIR = path.resolve(__dirname, '../../');
 
-const PORT = parseInt(process.env.PORT || '3847', 10);
+const PORT = parseInt(process.env.PORT || '3848', 10);
 const TIMEZONE = process.env.TIMEZONE || 'Asia/Colombo';
 const DEFAULT_COUNTRY_CODE = process.env.DEFAULT_COUNTRY_CODE || '94';
 
