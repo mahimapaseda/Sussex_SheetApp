@@ -163,6 +163,7 @@ const els = {
   manualInputPhone: $('manualInputPhone'),
   manualInputName: $('manualInputName'),
   manualInputMessage: $('manualInputMessage'),
+  btnResetManualMessageToTemplate: $('btnResetManualMessageToTemplate'),
   manualPhoneStatusBadge: $('manualPhoneStatusBadge'),
   navManualSendBtn: $('navManualSendBtn'),
   mobileManualSendBtn: $('mobileManualSendBtn'),
@@ -414,6 +415,28 @@ function bindEvents() {
   els.closeManualSendModalBtn?.addEventListener('click', closeManualModal);
   els.cancelManualSendBtn?.addEventListener('click', closeManualModal);
   els.manualSendForm?.addEventListener('submit', handleManualSendSubmit);
+
+  els.btnResetManualMessageToTemplate?.addEventListener('click', () => {
+    const currentName = els.manualInputName?.value.trim() || '';
+    const currentPhone = els.manualInputPhone?.value.trim() || '';
+    const matchedRow = appState.rosterRecords?.find(r => 
+      (r.rawPhone && currentPhone && r.rawPhone === currentPhone) ||
+      (r.normalizedPhone && currentPhone && r.normalizedPhone === currentPhone) ||
+      (r.name && currentName && r.name.toLowerCase() === currentName.toLowerCase())
+    );
+    const rowContext = matchedRow || { name: currentName, rawPhone: currentPhone };
+    if (els.manualInputMessage) {
+      els.manualInputMessage.value = interpolateLocal(getActiveTemplateText(), rowContext);
+      showToast('Active template loaded with recipient details!', 'info');
+    }
+  });
+
+  els.manualInputName?.addEventListener('input', () => {
+    if (els.manualInputMessage && !els.manualInputMessage.value.trim()) {
+      const name = els.manualInputName.value.trim();
+      els.manualInputMessage.value = interpolateLocal(getActiveTemplateText(), { name });
+    }
+  });
 
   // Settings Modal
   const openSettings = () => openSettingsModal();
@@ -1165,28 +1188,101 @@ function renderRosterTable(records = []) {
   }
 }
 
+// Helper to retrieve the current active template text reliably
+function getActiveTemplateText() {
+  if (Array.isArray(appState.templates) && appState.templates.length > 0) {
+    const active = appState.templates.find(t => (appState.activeTemplateId && t.id === appState.activeTemplateId) || t.enabled);
+    if (active && typeof active.messageTemplate === 'string' && active.messageTemplate.trim().length > 0) {
+      return active.messageTemplate;
+    }
+    const firstWithMsg = appState.templates.find(t => typeof t.messageTemplate === 'string' && t.messageTemplate.trim().length > 0);
+    if (firstWithMsg) return firstWithMsg.messageTemplate;
+  }
+  if (appState.settings && typeof appState.settings.messageTemplate === 'string' && appState.settings.messageTemplate.trim().length > 0) {
+    return appState.settings.messageTemplate;
+  }
+  if (els.mainTemplateTextarea && els.mainTemplateTextarea.value && els.mainTemplateTextarea.value.trim().length > 0) {
+    return els.mainTemplateTextarea.value;
+  }
+  return 'Hello {Name}, this is an automated update regarding your record. Please let us know if you need any assistance!\n\nBest regards';
+}
+
 // Direct send to single row
 window.dispatchDirectToRow = function(rowIndex) {
   const row = appState.rosterRecords.find(r => r.rowIndex === rowIndex);
   if (!row) return;
 
-  if (els.manualInputPhone) els.manualInputPhone.value = row.rawPhone || row.normalizedPhone;
-  if (els.manualInputName) els.manualInputName.value = row.name;
+  const phone = row.rawPhone || row.normalizedPhone || '';
+  const name = row.name || '';
+  const tpl = getActiveTemplateText();
 
-  // Pre-fill message
-  const tpl = els.mainTemplateTextarea?.value || '';
+  if (els.manualInputPhone) els.manualInputPhone.value = phone;
+  if (els.manualInputName) els.manualInputName.value = name;
+
+  // Pre-fill message with resolved variables
   if (els.manualInputMessage) {
-    els.manualInputMessage.value = interpolateLocal(tpl, row.rowData);
+    els.manualInputMessage.value = interpolateLocal(tpl, row);
   }
 
   openManualModal();
 };
 
-function interpolateLocal(tpl, data = {}) {
+function interpolateLocal(tpl, rowOrData = {}) {
   if (!tpl) return '';
-  return tpl.replace(/\{+([^{}]+)\}+/g, (m, k) => {
-    const key = k.trim();
-    return data[key] !== undefined ? String(data[key]).trim() : '';
+  const rowData = rowOrData.rowData || (typeof rowOrData === 'object' ? rowOrData : {});
+  const directName = rowOrData.name || '';
+  const directBranch = rowOrData.branch || '';
+  const directPhone = rowOrData.rawPhone || rowOrData.normalizedPhone || '';
+
+  return tpl.replace(/\{+([^{}]+)\}+/g, (match, rawKey) => {
+    const key = rawKey.trim();
+
+    // 1. Direct match in rowData
+    if (rowData[key] !== undefined && rowData[key] !== null && String(rowData[key]).trim() !== '') {
+      return String(rowData[key]).trim();
+    }
+
+    // 2. Normalized key match (case-insensitive, alphanumeric only)
+    const normKey = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    // Name tokens: {Name}, {StudentName}, {Full Name}, {Recipient Name}, {Name of Student}, etc.
+    if (normKey === 'name' || normKey === 'studentname' || normKey === 'fullname' || normKey === 'recipientname' || normKey === 'nameofstudent') {
+      if (directName) return directName;
+    }
+
+    // Branch tokens: {Branch}, {School}, {Campus}
+    if (normKey === 'branch' || normKey === 'school' || normKey === 'campus') {
+      if (directBranch) return directBranch;
+    }
+
+    // Phone tokens: {Phone}, {Mobile}, {Contact}, {ContactNo}
+    if (normKey === 'phone' || normKey === 'mobile' || normKey === 'contact' || normKey === 'contactno') {
+      if (directPhone) return directPhone;
+    }
+
+    // First Name token: {FirstName}
+    if (normKey === 'firstname') {
+      const candidateName = directName || rowData['Name'] || rowData['Full Name'] || rowData['Student Name'] || rowData['Name of Student'] || '';
+      if (candidateName) {
+        return String(candidateName).trim().split(' ')[0];
+      }
+    }
+
+    // Search in rowData properties
+    for (const [k, v] of Object.entries(rowData)) {
+      if (k.toLowerCase().replace(/[^a-z0-9]/g, '') === normKey) {
+        if (v !== undefined && v !== null && String(v).trim() !== '') {
+          return String(v).trim();
+        }
+      }
+    }
+
+    // Fallback if token is {Name} and name is not provided
+    if (normKey === 'name') {
+      return directName || 'Parent / Guardian';
+    }
+
+    return '';
   });
 }
 
@@ -1308,6 +1404,14 @@ function openManualModal() {
   } else {
     els.manualAttachImageRow?.classList.add('hidden');
   }
+
+  // Pre-fill message with active template if currently empty
+  if (els.manualInputMessage && (!els.manualInputMessage.value || !els.manualInputMessage.value.trim())) {
+    const candidateName = els.manualInputName?.value.trim() || '';
+    const tpl = getActiveTemplateText();
+    els.manualInputMessage.value = interpolateLocal(tpl, { name: candidateName });
+  }
+
   els.manualSendModal?.classList.remove('hidden');
 }
 function closeManualModal() {
@@ -1509,6 +1613,13 @@ async function loadSettingsData() {
   try {
     const res = await fetch('/api/settings');
     const s = await res.json();
+    appState.settings = s;
+    if (Array.isArray(s.savedTemplates)) {
+      appState.templates = s.savedTemplates;
+    }
+    if (s.activeTemplateId) {
+      appState.activeTemplateId = s.activeTemplateId;
+    }
     if (els.inputGoogleSheetId) els.inputGoogleSheetId.value = s.googleSheetId || '';
     if (els.inputGoogleSheetTab) els.inputGoogleSheetTab.value = s.googleSheetTab || 'Sheet1';
     if (els.inputCountryCode) els.inputCountryCode.value = s.defaultCountryCode || '94';
@@ -1644,8 +1755,13 @@ async function loadTemplates() {
     }
 
     const activeTemplate = templates.find(t => t.id === activeId || t.enabled);
-    if (activeTemplate && els.activeTemplateNameLabel) {
-      els.activeTemplateNameLabel.textContent = activeTemplate.name;
+    if (activeTemplate) {
+      if (els.activeTemplateNameLabel) {
+        els.activeTemplateNameLabel.textContent = activeTemplate.name;
+      }
+      if (els.mainTemplateTextarea && (!els.mainTemplateTextarea.value || els.mainTemplateTextarea.value.trim() === '')) {
+        els.mainTemplateTextarea.value = activeTemplate.messageTemplate || '';
+      }
     }
 
     renderSavedTemplates(templates, activeId);
