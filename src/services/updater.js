@@ -252,7 +252,7 @@ function checkForUpdates(customConfig = {}) {
  * CRITICAL: When GitHub redirects to AWS S3 storage (HTTP 302 Found),
  * the Authorization header MUST be stripped to prevent S3 rejection.
  */
-function downloadReleaseAsset(assetApiUrl, targetFilePath, token, onProgress) {
+function downloadReleaseAsset(assetApiUrl, targetFilePath, token, onProgress, expectedTotalBytes = 0) {
   return new Promise((resolve, reject) => {
     const initialHeaders = {
       'User-Agent': 'SheetApp-Updater',
@@ -293,7 +293,8 @@ function downloadReleaseAsset(assetApiUrl, targetFilePath, token, onProgress) {
           return;
         }
 
-        const totalBytes = parseInt(res.headers['content-length'] || '0', 10);
+        const headerLen = parseInt(res.headers['content-length'] || '0', 10);
+        const totalBytes = headerLen > 0 ? headerLen : expectedTotalBytes;
         let downloadedBytes = 0;
         let lastTime = Date.now();
         let lastDownloaded = 0;
@@ -314,14 +315,17 @@ function downloadReleaseAsset(assetApiUrl, targetFilePath, token, onProgress) {
             lastDownloaded = downloadedBytes;
           }
 
-          const percent = totalBytes > 0 ? Math.round((downloadedBytes / totalBytes) * 100) : 0;
+          const percent = totalBytes > 0 ? Math.min(100, Math.round((downloadedBytes / totalBytes) * 100)) : 0;
           const progressPayload = {
             percent,
             downloadedBytes,
+            transferred: downloadedBytes,
             totalBytes,
+            total: totalBytes,
             downloadedMB: (downloadedBytes / (1024 * 1024)).toFixed(1),
             totalMB: (totalBytes / (1024 * 1024)).toFixed(1),
-            speedKBps
+            speedKBps,
+            bytesPerSecond: speedKBps * 1024
           };
 
           updaterState.progress = progressPayload;
@@ -398,7 +402,7 @@ async function downloadUpdate(onProgress) {
     const downloadUrl = asset.apiUrl || asset.browserDownloadUrl;
     const result = await downloadReleaseAsset(downloadUrl, targetPath, token, (prog) => {
       if (typeof onProgress === 'function') onProgress(prog);
-    });
+    }, asset.size || 0);
 
     updaterState.status = 'READY_TO_INSTALL';
     updaterState.downloadedFilePath = result.filePath;

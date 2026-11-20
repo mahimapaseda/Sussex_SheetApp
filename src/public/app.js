@@ -2152,13 +2152,23 @@ function renderUpdaterUI(state) {
     if (els.updateProgressBar) els.updateProgressBar.style.width = `${pct}%`;
     if (els.updateProgressPercent) els.updateProgressPercent.textContent = `${pct}%`;
     if (els.updateProgressBytes) {
-      const mbTransferred = ((state.progress?.transferred || 0) / (1024 * 1024)).toFixed(1);
-      const mbTotal = ((state.progress?.total || 0) / (1024 * 1024)).toFixed(1);
+      const mbTransferred = state.progress?.downloadedMB !== undefined
+        ? state.progress.downloadedMB
+        : (((state.progress?.downloadedBytes || state.progress?.transferred || 0) / (1024 * 1024)).toFixed(1));
+      const mbTotal = state.progress?.totalMB !== undefined
+        ? state.progress.totalMB
+        : (((state.progress?.totalBytes || state.progress?.total || 0) / (1024 * 1024)).toFixed(1));
       els.updateProgressBytes.textContent = `${mbTransferred} MB / ${mbTotal} MB`;
     }
     if (els.updateProgressSpeed) {
-      const kbps = Math.round((state.progress?.bytesPerSecond || 0) / 1024);
-      els.updateProgressSpeed.textContent = `${kbps} KB/s`;
+      const speed = state.progress?.speedKBps !== undefined
+        ? state.progress.speedKBps
+        : Math.round((state.progress?.bytesPerSecond || 0) / 1024);
+      if (speed >= 1024) {
+        els.updateProgressSpeed.textContent = `${(speed / 1024).toFixed(1)} MB/s`;
+      } else {
+        els.updateProgressSpeed.textContent = `${speed} KB/s`;
+      }
     }
     if (els.updateProgressStatusText) {
       els.updateProgressStatusText.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-emerald-600 mr-1.5"></i><span>Downloading update package...</span>';
