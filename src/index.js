@@ -37,7 +37,7 @@ app.get('/api/status', (req, res) => {
 
   res.json({
     appName: 'SheetApp',
-    version: '1.4.4',
+    version: '1.4.5',
     whatsapp: wa,
     batch,
     settings: userSettings
@@ -500,13 +500,17 @@ app.post('/api/whatsapp/send-single', async (req, res) => {
     }
 
     let mediaPath = null;
-    if (includeImage && currentSettings.attachedImage?.enabled && currentSettings.attachedImage?.path) {
+    if (includeImage && currentSettings.attachedImage?.path) {
       if (fs.existsSync(currentSettings.attachedImage.path)) {
         mediaPath = currentSettings.attachedImage.path;
       }
     }
 
-    const sendResult = await whatsappClient.sendMessage(phoneResult.normalized, message, mediaPath);
+    // Message is optional: if no media is attached and text is blank, use space so WhatsApp does not throw
+    const rawMessage = (message !== undefined && message !== null) ? String(message) : '';
+    const dispatchText = (!mediaPath && !rawMessage.trim()) ? ' ' : rawMessage;
+
+    const sendResult = await whatsappClient.sendMessage(phoneResult.normalized, dispatchText, mediaPath);
     if (sendResult.success) {
       ledger.recordSent({
         phone: phoneResult.normalized,

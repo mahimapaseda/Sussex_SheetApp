@@ -1422,11 +1422,11 @@ async function handleManualSendSubmit(e) {
   e.preventDefault();
   const phone = els.manualInputPhone?.value.trim();
   const name = els.manualInputName?.value.trim();
-  const message = els.manualInputMessage?.value.trim();
+  const message = els.manualInputMessage?.value.trim() || '';
   const includeImage = els.manualIncludeImageCheckbox?.checked || false;
 
-  if (!phone || !message) {
-    showToast('Phone and message are required.', 'warning');
+  if (!phone) {
+    showToast('WhatsApp mobile number is required.', 'warning');
     return;
   }
 
